@@ -1,0 +1,20 @@
+﻿KAHybrid class source selection for Level 50:
+WAR: L50 - Lvl 50 WAR ini - TLP | https://www.redguides.com/community/resources/lvl-50-war-ini-tlp.1856/
+CLR: L50 - Work in Progress - 50 CLR TLP w/conditions | https://www.redguides.com/community/resources/50-clr-tlp-w-conditions.1645/
+PAL: L50 - Paladin - Level 50 - Maximum Effort! | https://www.redguides.com/community/resources/paladin-level-50-maximum-effort.2754/
+RNG: L50 - Lvl 50 RNG ini w/o conditions for KA11 | https://www.redguides.com/community/resources/lvl-50-rng-ini-w-o-conditions-for-ka11.1128/
+SHD: L50 - Lvl 50 SHD ini w/ conditions | https://www.redguides.com/community/resources/lvl-50-shd-ini-w-conditions.1569/
+DRU: L50 - Work in Progress - 50 Druid DPS Healer | https://www.redguides.com/community/resources/50-druid-dps-healer.2111/
+MNK: L39 - Almar&#039;s 60 MNK (Luclin Era) | https://www.redguides.com/community/resources/almars-60-mnk-luclin-era.726/
+BRD: L50 - Lvl 50 BRD ini - TLP | https://www.redguides.com/community/resources/lvl-50-brd-ini-tlp.1741/
+ROG: L50 - Rogue - Level 50 - Maximum effort! | https://www.redguides.com/community/resources/rogue-level-50-maximum-effort.2758/
+SHM: L50 - Shaman - Level 50 - Maximum effort! | https://www.redguides.com/community/resources/shaman-level-50-maximum-effort.2755/
+NEC: L50 - Work in Progress - 50 Necro | https://www.redguides.com/community/resources/50-necro.2109/
+WIZ: L50 - Wizard - Level 50 - Maximum effort! | https://www.redguides.com/community/resources/wizard-level-50-maximum-effort.2756/
+MAG: L40 - Lvl 40 MAG ini w/conditions for KA11 | https://www.redguides.com/community/resources/lvl-40-mag-ini-w-conditions-for-ka11.1360/
+ENC: L50 - Lvl 50 ENC ini w/o conditions for KA11 | https://www.redguides.com/community/resources/lvl-50-enc-ini-w-o-conditions-for-ka11.990/
+BST: L50 - Level 50 Beastlord w/o conditions for KA 11.005 | https://www.redguides.com/community/resources/level-50-beastlord-w-o-conditions-for-ka-11-005.1644/
+BER: L40 - Work in Progress - Level 40 Berserker | https://www.redguides.com/community/resources/level-40-berserker.1814/
+
+Generated files: 48
+Total KA resources scanned: 1338
