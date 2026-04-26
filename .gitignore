@@ -13,3 +13,7 @@ config/Ultimate EQ [DEV]_*.ini
 config/Ultimate EQ_*.ini
 config/UltimateEQAssist_E9 Profusion_*.ini
 config/UltimateEQAssist_UltEQTest_*.ini
+config/luaconsole_autosave_*.json
+config/luaconsole_settings_*.lua
+config/luaconsole_snippets_*.json
+config/luaconsole_state_*.json
