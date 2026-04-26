@@ -1,0 +1,9 @@
+UltimateEQAssist Deployable Package
+
+Extract this archive into your MacroQuest root folder and allow merge/overwrite when prompted.
+
+This package is structured for direct deploy:
+ - lua\...
+ - config\...
+
+Included systems: MAUI, UltimateEQAssist templates/presets, SmartLoot, EZInventory, EZBots, SpawnWatch, BuffBot, Grouper, HunterHud, LEM, LuaConsole.

@@ -1,0 +1,1193 @@
+local mq = require('mq')
+require 'ImGui'
+
+local openGUI = true
+local showUI = true
+
+local GM_PREFIX = '#'
+
+-- Persistent input buffer as a plain string with fixed buffer size
+local searchText = ''
+local bufferSize = 256
+
+-- Confirmation dialog state
+local showConfirmDialog = false
+local confirmCommand = ''
+local confirmCommandNeedsParam = false
+local confirmParamText = ''
+local confirmParamBufferSize = 256
+
+-- Tab system
+local currentTab = 1  -- 1 = Main Dev Console, 2 = Quest NPC Testing, 3 = GM Items & Flags, 4 = Player Commands, 5 = NPC Commands
+
+-- Timer-based spawning system
+local spawnQueue = {}
+local lastSpawnTime = 0
+local spawnDelay = 0.5  -- 500ms between spawns
+
+-- Button size for uniform appearance
+local buttonWidth = 75  -- Reduced width to fit 4 buttons per row
+local buttonHeight = 0  -- 0 = auto height
+
+-- Theme system
+local currentTheme = 1  -- Default to first theme
+local themes = {
+    -- Theme 1: Neon Purple (Original)
+    {
+        name = "Neon Purple",
+        windowBg = {0.05, 0.05, 0.05, 0.95},
+        titleBg = {0.1, 0.05, 0.15, 1.0},
+        titleBgActive = {0.3, 0.1, 0.4, 1.0},
+        button = {0.5, 0.1, 0.7, 1.0},
+        buttonHovered = {0.7, 0.2, 0.9, 1.0},
+        buttonActive = {0.4, 0.05, 0.6, 1.0},
+        frameBg = {0.15, 0.1, 0.2, 1.0},
+        frameBgHovered = {0.25, 0.15, 0.3, 1.0},
+        header = {0.4, 0.15, 0.55, 1.0},
+        text = {0.95, 0.85, 1.0, 1.0},
+        border = {0.6, 0.2, 0.8, 0.5},
+        separator = {0.5, 0.2, 0.7, 0.8}
+    },
+    -- Theme 2: Cyber Blue
+    {
+        name = "Cyber Blue",
+        windowBg = {0.02, 0.02, 0.08, 0.95},
+        titleBg = {0.05, 0.1, 0.2, 1.0},
+        titleBgActive = {0.1, 0.3, 0.5, 1.0},
+        button = {0.1, 0.4, 0.8, 1.0},
+        buttonHovered = {0.2, 0.5, 0.95, 1.0},
+        buttonActive = {0.05, 0.3, 0.6, 1.0},
+        frameBg = {0.1, 0.15, 0.25, 1.0},
+        frameBgHovered = {0.15, 0.25, 0.35, 1.0},
+        header = {0.15, 0.4, 0.65, 1.0},
+        text = {0.85, 0.95, 1.0, 1.0},
+        border = {0.2, 0.6, 0.9, 0.5},
+        separator = {0.2, 0.5, 0.8, 0.8}
+    },
+    -- Theme 3: Toxic Green
+    {
+        name = "Toxic Green",
+        windowBg = {0.02, 0.05, 0.02, 0.95},
+        titleBg = {0.05, 0.15, 0.05, 1.0},
+        titleBgActive = {0.1, 0.4, 0.1, 1.0},
+        button = {0.2, 0.7, 0.2, 1.0},
+        buttonHovered = {0.3, 0.9, 0.3, 1.0},
+        buttonActive = {0.15, 0.5, 0.15, 1.0},
+        frameBg = {0.1, 0.2, 0.1, 1.0},
+        frameBgHovered = {0.15, 0.3, 0.15, 1.0},
+        header = {0.2, 0.6, 0.2, 1.0},
+        text = {0.85, 1.0, 0.85, 1.0},
+        border = {0.3, 0.8, 0.3, 0.5},
+        separator = {0.25, 0.7, 0.25, 0.8}
+    },
+    -- Theme 4: Hot Pink
+    {
+        name = "Hot Pink",
+        windowBg = {0.08, 0.02, 0.05, 0.95},
+        titleBg = {0.2, 0.05, 0.1, 1.0},
+        titleBgActive = {0.5, 0.1, 0.3, 1.0},
+        button = {0.9, 0.2, 0.5, 1.0},
+        buttonHovered = {1.0, 0.4, 0.7, 1.0},
+        buttonActive = {0.7, 0.1, 0.4, 1.0},
+        frameBg = {0.2, 0.1, 0.15, 1.0},
+        frameBgHovered = {0.3, 0.15, 0.25, 1.0},
+        header = {0.7, 0.15, 0.4, 1.0},
+        text = {1.0, 0.85, 0.95, 1.0},
+        border = {0.9, 0.3, 0.6, 0.5},
+        separator = {0.8, 0.25, 0.5, 0.8}
+    },
+    -- Theme 5: Orange Blaze
+    {
+        name = "Orange Blaze",
+        windowBg = {0.05, 0.03, 0.0, 0.95},
+        titleBg = {0.15, 0.08, 0.0, 1.0},
+        titleBgActive = {0.4, 0.2, 0.0, 1.0},
+        button = {0.9, 0.5, 0.1, 1.0},
+        buttonHovered = {1.0, 0.6, 0.2, 1.0},
+        buttonActive = {0.7, 0.4, 0.05, 1.0},
+        frameBg = {0.2, 0.12, 0.05, 1.0},
+        frameBgHovered = {0.3, 0.18, 0.08, 1.0},
+        header = {0.7, 0.4, 0.1, 1.0},
+        text = {1.0, 0.95, 0.85, 1.0},
+        border = {0.9, 0.5, 0.2, 0.5},
+        separator = {0.8, 0.45, 0.15, 0.8}
+    },
+    -- Theme 6: Ice Blue
+    {
+        name = "Ice Blue",
+        windowBg = {0.02, 0.05, 0.08, 0.95},
+        titleBg = {0.05, 0.12, 0.18, 1.0},
+        titleBgActive = {0.1, 0.25, 0.4, 1.0},
+        button = {0.2, 0.6, 0.8, 1.0},
+        buttonHovered = {0.3, 0.75, 0.95, 1.0},
+        buttonActive = {0.15, 0.5, 0.65, 1.0},
+        frameBg = {0.1, 0.18, 0.25, 1.0},
+        frameBgHovered = {0.15, 0.25, 0.35, 1.0},
+        header = {0.2, 0.5, 0.7, 1.0},
+        text = {0.9, 0.98, 1.0, 1.0},
+        border = {0.3, 0.7, 0.9, 0.5},
+        separator = {0.25, 0.65, 0.85, 0.8}
+    },
+    -- Theme 7: Matrix Hacker (Green on Black)
+    {
+        name = "Matrix Hack",
+        windowBg = {0.0, 0.0, 0.0, 0.98},
+        titleBg = {0.0, 0.08, 0.0, 1.0},
+        titleBgActive = {0.0, 0.25, 0.0, 1.0},
+        button = {0.0, 0.5, 0.0, 1.0},
+        buttonHovered = {0.0, 0.7, 0.0, 1.0},
+        buttonActive = {0.0, 0.35, 0.0, 1.0},
+        frameBg = {0.0, 0.12, 0.0, 1.0},
+        frameBgHovered = {0.0, 0.2, 0.0, 1.0},
+        header = {0.0, 0.4, 0.0, 1.0},
+        text = {0.0, 1.0, 0.0, 1.0},
+        border = {0.0, 0.6, 0.0, 0.7},
+        separator = {0.0, 0.5, 0.0, 0.9}
+    },
+    -- Theme 8: Terminal Hacker (Green/Cyan on Deep Black)
+    {
+        name = "Term Hacker",
+        windowBg = {0.0, 0.02, 0.0, 0.98},
+        titleBg = {0.0, 0.1, 0.05, 1.0},
+        titleBgActive = {0.0, 0.3, 0.15, 1.0},
+        button = {0.0, 0.6, 0.3, 1.0},
+        buttonHovered = {0.0, 0.8, 0.4, 1.0},
+        buttonActive = {0.0, 0.45, 0.22, 1.0},
+        frameBg = {0.0, 0.15, 0.08, 1.0},
+        frameBgHovered = {0.0, 0.25, 0.12, 1.0},
+        header = {0.0, 0.5, 0.25, 1.0},
+        text = {0.2, 1.0, 0.6, 1.0},
+        border = {0.0, 0.7, 0.35, 0.7},
+        separator = {0.0, 0.6, 0.3, 0.9}
+    }
+}
+
+local function executeGMCommand(baseCmd, useSearchText)
+    local fullCommand
+    if useSearchText then
+        fullCommand = GM_PREFIX .. baseCmd .. searchText
+    else
+        fullCommand = GM_PREFIX .. baseCmd
+    end
+    print('[Debug] Sending: ' .. fullCommand)
+    mq.cmdf('/say %s', fullCommand)
+end
+
+-- Summon item by ID
+local function summonItem(itemID, quantity)
+    quantity = quantity or 1
+    local fullCommand = GM_PREFIX .. 'summonitem ' .. itemID .. ' ' .. quantity
+    print('[Debug] Summoning: ' .. fullCommand)
+    mq.cmdf('/say %s', fullCommand)
+end
+
+-- Add NPCs to spawn queue
+local function spawnMultipleNPCs(npcID, count)
+    print('[Debug] Queueing ' .. count .. ' NPCs with ID ' .. npcID)
+    for i = 1, count do
+        table.insert(spawnQueue, {npcID = npcID, number = i, total = count})
+    end
+end
+
+-- Process spawn queue (called in main render loop)
+local function processSpawnQueue()
+    if #spawnQueue > 0 then
+        local currentTime = os.clock()
+        if currentTime - lastSpawnTime >= spawnDelay then
+            local spawnData = table.remove(spawnQueue, 1)
+            local fullCommand = GM_PREFIX .. 'dbspawn ' .. spawnData.npcID
+            print('[Debug] Spawning NPC ' .. spawnData.number .. '/' .. spawnData.total .. ': ' .. fullCommand)
+            mq.cmdf('/say %s', fullCommand)
+            lastSpawnTime = currentTime
+        end
+    end
+end
+
+-- Open confirmation dialog for dangerous commands
+local function openConfirmDialog(cmd, needsParam)
+    confirmCommand = cmd
+    confirmCommandNeedsParam = needsParam
+    confirmParamText = ''
+    showConfirmDialog = true
+end
+
+-- Execute confirmed command
+local function executeConfirmedCommand()
+    local fullCommand
+    if confirmCommandNeedsParam then
+        fullCommand = GM_PREFIX .. confirmCommand .. confirmParamText
+    else
+        fullCommand = GM_PREFIX .. confirmCommand
+    end
+    print('[Debug] Sending CONFIRMED: ' .. fullCommand)
+    mq.cmdf('/say %s', fullCommand)
+    showConfirmDialog = false
+    confirmParamText = ''
+end
+
+-- Helper function to draw colored separator text
+local function ColoredSeparatorText(text, r, g, b, a)
+    ImGui.PushStyleColor(ImGuiCol.Text, r, g, b, a)
+    ImGui.SeparatorText(text)
+    ImGui.PopStyleColor(1)
+end
+
+-- Apply current theme
+local function applyTheme()
+    local theme = themes[currentTheme]
+    ImGui.PushStyleColor(ImGuiCol.WindowBg, theme.windowBg[1], theme.windowBg[2], theme.windowBg[3], theme.windowBg[4])
+    ImGui.PushStyleColor(ImGuiCol.TitleBg, theme.titleBg[1], theme.titleBg[2], theme.titleBg[3], theme.titleBg[4])
+    ImGui.PushStyleColor(ImGuiCol.TitleBgActive, theme.titleBgActive[1], theme.titleBgActive[2], theme.titleBgActive[3], theme.titleBgActive[4])
+    ImGui.PushStyleColor(ImGuiCol.Button, theme.button[1], theme.button[2], theme.button[3], theme.button[4])
+    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, theme.buttonHovered[1], theme.buttonHovered[2], theme.buttonHovered[3], theme.buttonHovered[4])
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, theme.buttonActive[1], theme.buttonActive[2], theme.buttonActive[3], theme.buttonActive[4])
+    ImGui.PushStyleColor(ImGuiCol.FrameBg, theme.frameBg[1], theme.frameBg[2], theme.frameBg[3], theme.frameBg[4])
+    ImGui.PushStyleColor(ImGuiCol.FrameBgHovered, theme.frameBgHovered[1], theme.frameBgHovered[2], theme.frameBgHovered[3], theme.frameBgHovered[4])
+    ImGui.PushStyleColor(ImGuiCol.Header, theme.header[1], theme.header[2], theme.header[3], theme.header[4])
+    ImGui.PushStyleColor(ImGuiCol.Text, theme.text[1], theme.text[2], theme.text[3], theme.text[4])
+    ImGui.PushStyleColor(ImGuiCol.Border, theme.border[1], theme.border[2], theme.border[3], theme.border[4])
+    ImGui.PushStyleColor(ImGuiCol.Separator, theme.separator[1], theme.separator[2], theme.separator[3], theme.separator[4])
+end
+
+-- Render confirmation dialog
+local function renderConfirmDialog()
+    if not showConfirmDialog then return end
+    
+    applyTheme()
+    ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 8, 8)
+    ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 6)
+    ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 8)
+    
+    ImGui.SetNextWindowSize(400, 200, ImGuiCond.FirstUseEver)
+    local confirmOpen, confirmShow = ImGui.Begin(' CONFIRM CRITICAL COMMAND ', true, ImGuiWindowFlags.NoCollapse)
+    
+    if confirmShow then
+        -- Warning text
+        ImGui.PushStyleColor(ImGuiCol.Text, 1.0, 0.3, 0.3, 1.0)  -- Red warning text
+        ImGui.TextWrapped('WARNING: You are about to execute a critical GM command!')
+        ImGui.PopStyleColor(1)
+        
+        ImGui.Spacing()
+        ImGui.Text('Command: #' .. confirmCommand)
+        ImGui.Spacing()
+        
+        if confirmCommandNeedsParam then
+            ImGui.Text('Enter parameter (zone name, player name, etc.):')
+            confirmParamText = ImGui.InputText('##confirm_param', confirmParamText, confirmParamBufferSize)
+            ImGui.Spacing()
+        end
+        
+        ImGui.TextWrapped('Are you sure you wish to execute this command?')
+        ImGui.Spacing()
+        ImGui.Separator()
+        ImGui.Spacing()
+        
+        -- Buttons
+        ImGui.PushStyleColor(ImGuiCol.Button, 0.8, 0.2, 0.2, 1.0)  -- Red confirm button
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 1.0, 0.3, 0.3, 1.0)
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0.6, 0.15, 0.15, 1.0)
+        
+        if ImGui.Button(' YES, EXECUTE COMMAND', 180, 30) then
+            executeConfirmedCommand()
+        end
+        ImGui.PopStyleColor(3)
+        
+        ImGui.SameLine()
+        
+        ImGui.PushStyleColor(ImGuiCol.Button, 0.3, 0.3, 0.3, 1.0)  -- Gray cancel button
+        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, 0.4, 0.4, 0.4, 1.0)
+        ImGui.PushStyleColor(ImGuiCol.ButtonActive, 0.2, 0.2, 0.2, 1.0)
+        
+        if ImGui.Button(' CANCEL', 180, 30) then
+            showConfirmDialog = false
+            confirmParamText = ''
+        end
+        ImGui.PopStyleColor(3)
+    end
+    
+    ImGui.End()
+    
+    ImGui.PopStyleVar(3)
+    ImGui.PopStyleColor(12)
+    
+    if not confirmOpen then
+        showConfirmDialog = false
+        confirmParamText = ''
+    end
+end
+
+-- Render Main Dev Console Tab with Collapsible Sections
+local function renderMainDevConsole()
+    ImGui.Text('Player: ' .. (mq.TLO.Me.Name() or 'Unknown'))
+    ImGui.Text('Zone: ' .. (mq.TLO.Zone.Name() or 'Unknown'))
+    ImGui.Spacing()
+
+    -- Theme Selector - Collapsible
+    if ImGui.CollapsingHeader('Theme Selector', ImGuiTreeNodeFlags.DefaultOpen) then
+        ImGui.Text('Current Theme: ' .. themes[currentTheme].name)
+        
+        -- Theme buttons (2 rows of 4)
+        if ImGui.Button(themes[1].name, buttonWidth, buttonHeight) then currentTheme = 1 end
+        ImGui.SameLine()
+        if ImGui.Button(themes[2].name, buttonWidth, buttonHeight) then currentTheme = 2 end
+        ImGui.SameLine()
+        if ImGui.Button(themes[3].name, buttonWidth, buttonHeight) then currentTheme = 3 end
+        ImGui.SameLine()
+        if ImGui.Button(themes[4].name, buttonWidth, buttonHeight) then currentTheme = 4 end
+        
+        if ImGui.Button(themes[5].name, buttonWidth, buttonHeight) then currentTheme = 5 end
+        ImGui.SameLine()
+        if ImGui.Button(themes[6].name, buttonWidth, buttonHeight) then currentTheme = 6 end
+        ImGui.SameLine()
+        if ImGui.Button(themes[7].name, buttonWidth, buttonHeight) then currentTheme = 7 end
+        ImGui.SameLine()
+        if ImGui.Button(themes[8].name, buttonWidth, buttonHeight) then currentTheme = 8 end
+    end
+
+    -- Parameter Box - Collapsible
+    if ImGui.CollapsingHeader('Parameter Box', ImGuiTreeNodeFlags.DefaultOpen) then
+        ImGui.Text('Type item name, ID, player name, etc.:')
+        searchText = ImGui.InputText('##param_box', searchText, bufferSize)
+        ImGui.TextWrapped('Type your text (e.g. fusion) → click button → sends "#command yourtext" via /say.')
+    end
+
+    -- BASIC GM COMMANDS - Collapsible
+    if ImGui.CollapsingHeader('Basic GM Commands (Status 100)', ImGuiTreeNodeFlags.None) then
+        -- Row 1
+        if ImGui.Button('Find Item', buttonWidth, buttonHeight) then executeGMCommand('fi ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Sum Item', buttonWidth, buttonHeight) then executeGMCommand('summonitem ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Item Info', buttonWidth, buttonHeight) then executeGMCommand('iteminfo', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Goto XYZ', buttonWidth, buttonHeight) then executeGMCommand('goto ', true) end
+
+        -- Row 2
+        if ImGui.Button('Zone', buttonWidth, buttonHeight) then executeGMCommand('zone ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Zone Stat', buttonWidth, buttonHeight) then executeGMCommand('zonestatus', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Set Level', buttonWidth, buttonHeight) then executeGMCommand('level ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Invul', buttonWidth, buttonHeight) then executeGMCommand('invul ', true) end
+
+        -- Row 3
+        if ImGui.Button('Hide Me', buttonWidth, buttonHeight) then executeGMCommand('hideme ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Stats', buttonWidth, buttonHeight) then executeGMCommand('showstats', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Freeze', buttonWidth, buttonHeight) then executeGMCommand('freeze', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Unfreeze', buttonWidth, buttonHeight) then executeGMCommand('unfreeze', false) end
+
+        -- Row 4
+        if ImGui.Button('PK On', buttonWidth, buttonHeight) then executeGMCommand('pkill', false) end
+        ImGui.SameLine()
+        if ImGui.Button('PK Off', buttonWidth, buttonHeight) then executeGMCommand('unpkill', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Guild', buttonWidth, buttonHeight) then executeGMCommand('guild ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Test Spwn', buttonWidth, buttonHeight) then executeGMCommand('testspawn', false) end
+
+        -- Row 5
+        if ImGui.Button('Save', buttonWidth, buttonHeight) then executeGMCommand('save', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Mem Spell', buttonWidth, buttonHeight) then executeGMCommand('memspell ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Animate', buttonWidth, buttonHeight) then executeGMCommand('doanim ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Haste', buttonWidth, buttonHeight) then executeGMCommand('haste ', true) end
+
+        -- Row 6
+        if ImGui.Button('NPC Cast', buttonWidth, buttonHeight) then executeGMCommand('npccast ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Uptime', buttonWidth, buttonHeight) then executeGMCommand('uptime', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Version', buttonWidth, buttonHeight) then executeGMCommand('version', false) end
+    end
+
+    -- NPC/CORPSE MANAGEMENT - Collapsible
+    if ImGui.CollapsingHeader('NPC/Corpse Management', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('List NPCs', buttonWidth, buttonHeight) then executeGMCommand('ListNPCs', false) end
+        ImGui.SameLine()
+        if ImGui.Button('NPC Corps', buttonWidth, buttonHeight) then executeGMCommand('ListNPCCorpses', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Plyr Corps', buttonWidth, buttonHeight) then executeGMCommand('ListPlayerCorpses', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Del NPC C', buttonWidth, buttonHeight) then executeGMCommand('DeleteNPCCorpses', false) end
+
+        if ImGui.Button('Del Tgt C', buttonWidth, buttonHeight) then executeGMCommand('deletecorpse', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Del Plyr C', buttonWidth, buttonHeight) then executeGMCommand('DeletePlayerCorpses', false) end
+    end
+
+    -- LEAD GM COMMANDS - Collapsible
+    if ImGui.CollapsingHeader('Lead GM Commands (Status 150)', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Summon', buttonWidth, buttonHeight) then openConfirmDialog('summon ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Kick', buttonWidth, buttonHeight) then openConfirmDialog('kick ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Set MOTD', buttonWidth, buttonHeight) then openConfirmDialog('motd ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Z Shutdwn', buttonWidth, buttonHeight) then openConfirmDialog('zoneshutdown ', true) end
+
+        if ImGui.Button('Z Bootup', buttonWidth, buttonHeight) then openConfirmDialog('zonebootup ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Lock Srv', buttonWidth, buttonHeight) then openConfirmDialog('lock', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Unlock Srv', buttonWidth, buttonHeight) then openConfirmDialog('unlock', false) end
+    end
+
+    -- ZONE COMMANDS - Collapsible
+    if ImGui.CollapsingHeader('Zone Management', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Repop', buttonWidth, buttonHeight) then executeGMCommand('repop ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Reload ZC', buttonWidth, buttonHeight) then executeGMCommand('reloadzctimers', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Doors', buttonWidth, buttonHeight) then executeGMCommand('doors', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Rld Rules', buttonWidth, buttonHeight) then executeGMCommand('reloadallrules', false) end
+    end
+
+    -- TARGET/NPC COMMANDS - Collapsible
+    if ImGui.CollapsingHeader('Target/NPC Commands', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Kill', buttonWidth, buttonHeight) then executeGMCommand('kill', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Depop', buttonWidth, buttonHeight) then executeGMCommand('depop', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Heal', buttonWidth, buttonHeight) then executeGMCommand('heal', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Spwn Add', buttonWidth, buttonHeight) then executeGMCommand('npcspawnadd', false) end
+
+        if ImGui.Button('Spwn Updt', buttonWidth, buttonHeight) then executeGMCommand('npcspawnupdate', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Repop Frc', buttonWidth, buttonHeight) then executeGMCommand('repop force', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Set Race', buttonWidth, buttonHeight) then executeGMCommand('set race ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Set Gndr', buttonWidth, buttonHeight) then executeGMCommand('set gender ', true) end
+    end
+
+    -- PLAYER/CHARACTER COMMANDS - Collapsible
+    if ImGui.CollapsingHeader('Player/Character Commands', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Plyr Info', buttonWidth, buttonHeight) then executeGMCommand('player ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('GM Char', buttonWidth, buttonHeight) then executeGMCommand('gmchar ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Give Item', buttonWidth, buttonHeight) then executeGMCommand('giveitem ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Meditation', buttonWidth, buttonHeight) then executeGMCommand('meditation ', true) end
+
+        if ImGui.Button('Lookup', buttonWidth, buttonHeight) then executeGMCommand('lookup ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Item Drop', buttonWidth, buttonHeight) then executeGMCommand('itemdropped ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Expedition', buttonWidth, buttonHeight) then executeGMCommand('expedition ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Create DZ', buttonWidth, buttonHeight) then executeGMCommand('createdz ', true) end
+
+        if ImGui.Button('Kick Exp', buttonWidth, buttonHeight) then executeGMCommand('kick exp ', true) end
+    end
+
+    -- GM MODE CONTROLS - Collapsible
+    if ImGui.CollapsingHeader('GM Mode Controls', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('GM On', buttonWidth, buttonHeight) then executeGMCommand('gm on', false) end
+        ImGui.SameLine()
+        if ImGui.Button('GM Off', buttonWidth, buttonHeight) then executeGMCommand('gm off', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Speed On', buttonWidth, buttonHeight) then executeGMCommand('gmspeed on', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Speed Off', buttonWidth, buttonHeight) then executeGMCommand('gmspeed off', false) end
+    end
+
+    -- MISC - Collapsible
+    if ImGui.CollapsingHeader('Misc', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Clear Box', buttonWidth, buttonHeight) then searchText = '' end
+        ImGui.SameLine()
+        if ImGui.Button('Close', buttonWidth, buttonHeight) then openGUI = false end
+    end
+end
+
+-- Render Quest NPC Testing Tab
+local function renderQuestNPCTesting()
+    ImGui.Text('Player: ' .. (mq.TLO.Me.Name() or 'Unknown'))
+    ImGui.Text('Zone: ' .. (mq.TLO.Zone.Name() or 'Unknown'))
+
+    -- Show spawn queue status
+    if #spawnQueue > 0 then
+        ImGui.PushStyleColor(ImGuiCol.Text, 1.0, 1.0, 0.3, 1.0)  -- Yellow text
+        ImGui.Text('Spawning in progress... (' .. #spawnQueue .. ' remaining)')
+        ImGui.PopStyleColor(1)
+        ImGui.Spacing()
+    end
+
+    -- NPC SPAWN TESTING - Red
+    ColoredSeparatorText('NPC Spawn Testing (ID: 757080)', 1.0, 0.3, 0.3, 1.0)
+    
+    ImGui.TextWrapped('Click a button to spawn multiple NPCs with ID 757080 using #dbspawn')
+    ImGui.Spacing()
+
+    -- Row 1: 2, 4, 8, 10
+    if ImGui.Button('Spawn 2', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 2) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 4', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 4) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 8', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 8) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 10', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 10) end
+
+    -- Row 2: 15, 20, 25, 30
+    if ImGui.Button('Spawn 15', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 15) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 20', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 20) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 25', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 25) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 30', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 30) end
+
+    -- Row 3: 35, 40, 45, 50
+    if ImGui.Button('Spawn 35', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 35) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 40', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 40) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 45', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 45) end
+    ImGui.SameLine()
+    if ImGui.Button('Spawn 50', buttonWidth, buttonHeight) then spawnMultipleNPCs(757080, 50) end
+
+    -- CLEANUP COMMANDS - Yellow
+    ColoredSeparatorText('Cleanup Commands', 1.0, 1.0, 0.3, 1.0)
+
+    if ImGui.Button('Kill All', buttonWidth, buttonHeight) then executeGMCommand('killallnpcs', false) end
+    ImGui.SameLine()
+    if ImGui.Button('Depop All', buttonWidth, buttonHeight) then executeGMCommand('depopall', false) end
+    ImGui.SameLine()
+    if ImGui.Button('Repop Zone', buttonWidth, buttonHeight) then executeGMCommand('repop', false) end
+    ImGui.SameLine()
+    if ImGui.Button('Del NPC C', buttonWidth, buttonHeight) then executeGMCommand('DeleteNPCCorpses', false) end
+end
+
+-- Render GM Items & Flags Tab with Collapsible Sections
+local function renderGMItemsFlags()
+    ImGui.Text('Player: ' .. (mq.TLO.Me.Name() or 'Unknown'))
+    ImGui.Text('Zone: ' .. (mq.TLO.Zone.Name() or 'Unknown'))
+    ImGui.Spacing()
+
+    -- STARTER ITEMS - Collapsible
+    if ImGui.CollapsingHeader('Starter Items', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('1st Items', buttonWidth, buttonHeight) then 
+            summonItem(147501)
+            summonItem(147580)
+            summonItem(147497)
+            summonItem(147511)
+            summonItem(147509)
+        end
+        ImGui.SameLine()
+        if ImGui.Button('Bags', buttonWidth, buttonHeight) then summonItem(32006) end
+        ImGui.SameLine()
+        if ImGui.Button('Food 20x', buttonWidth, buttonHeight) then 
+            summonItem(147537, 20)
+            summonItem(147536, 20)
+        end
+        ImGui.SameLine()
+        if ImGui.Button('Dye 8x', buttonWidth, buttonHeight) then summonItem(32557, 8) end
+
+        if ImGui.Button('Distiller', buttonWidth, buttonHeight) then summonItem(52023, 100) end
+        ImGui.SameLine()
+        if ImGui.Button('1M Money', buttonWidth, buttonHeight) then executeGMCommand('money', false) end
+    end
+
+    -- EPIC WEAPONS - Collapsible (UPDATED WITH ALL EPICS)
+    if ImGui.CollapsingHeader('Epic Weapons', ImGuiTreeNodeFlags.None) then
+        -- Epic 1.5 and 3.0
+        if ImGui.Button('Epic 1.5', buttonWidth, buttonHeight) then executeGMCommand('Epic1.5', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Epic 3.0', buttonWidth, buttonHeight) then executeGMCommand('Epic3.0', false) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Epic 4.0 Weapons:')
+        
+        -- Row 1: 4.0 Weapons
+        if ImGui.Button('Aurora 4.0', buttonWidth, buttonHeight) then summonItem(1006393) end
+        ImGui.SameLine()
+        if ImGui.Button('Fleet 4.0', buttonWidth, buttonHeight) then summonItem(1006394) end
+        ImGui.SameLine()
+        if ImGui.Button('Heyokah 4.0', buttonWidth, buttonHeight) then summonItem(1006395) end
+        ImGui.SameLine()
+        if ImGui.Button('DDealr 4.0', buttonWidth, buttonHeight) then summonItem(1006397) end
+        
+        -- Row 2
+        if ImGui.Button('Fist 4.0', buttonWidth, buttonHeight) then summonItem(1006407) end
+        ImGui.SameLine()
+        if ImGui.Button('Fist 4.0C', buttonWidth, buttonHeight) then summonItem(1007630) end
+        ImGui.SameLine()
+        if ImGui.Button('Inno 4.0', buttonWidth, buttonHeight) then summonItem(1006399) end
+        ImGui.SameLine()
+        if ImGui.Button('Krelj 4.0', buttonWidth, buttonHeight) then summonItem(1006400) end
+        
+        -- Row 3
+        if ImGui.Button('Nbane 4.0', buttonWidth, buttonHeight) then summonItem(1006401) end
+        ImGui.SameLine()
+        if ImGui.Button('Nshad 4.0', buttonWidth, buttonHeight) then summonItem(1006402) end
+        ImGui.SameLine()
+        if ImGui.Button('Elo Shld', buttonWidth, buttonHeight) then summonItem(1006404) end
+        ImGui.SameLine()
+        if ImGui.Button('Bram Shld', buttonWidth, buttonHeight) then summonItem(1006405) end
+        
+        -- Row 4
+        if ImGui.Button('Phen Shld', buttonWidth, buttonHeight) then summonItem(1006406) end
+        ImGui.SameLine()
+        if ImGui.Button('Prim Shld', buttonWidth, buttonHeight) then summonItem(1006396) end
+        ImGui.SameLine()
+        if ImGui.Button('Ward Shld', buttonWidth, buttonHeight) then summonItem(1006398) end
+        ImGui.SameLine()
+        if ImGui.Button('Spirit 4.0', buttonWidth, buttonHeight) then summonItem(1006403) end
+        
+        -- Row 5
+        if ImGui.Button('Veng 4.0', buttonWidth, buttonHeight) then summonItem(1006409) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Epic 4.5 Fusion Weapons:')
+        
+        -- Row 6: 4.5 Fusion Weapons
+        if ImGui.Button('Aurora 4.5', buttonWidth, buttonHeight) then summonItem(1006660) end
+        ImGui.SameLine()
+        if ImGui.Button('Fleet 4.5', buttonWidth, buttonHeight) then summonItem(1006661) end
+        ImGui.SameLine()
+        if ImGui.Button('DDealr 4.5', buttonWidth, buttonHeight) then summonItem(1006685) end
+        ImGui.SameLine()
+        if ImGui.Button('Fist F 4.5', buttonWidth, buttonHeight) then summonItem(1006683) end
+        
+        -- Row 7
+        if ImGui.Button('Fist P 4.5', buttonWidth, buttonHeight) then summonItem(1006682) end
+        ImGui.SameLine()
+        if ImGui.Button('Heyo 4.5', buttonWidth, buttonHeight) then summonItem(1006681) end
+        ImGui.SameLine()
+        if ImGui.Button('Inno 4.5', buttonWidth, buttonHeight) then summonItem(1006662) end
+        ImGui.SameLine()
+        if ImGui.Button('Krelj 4.5', buttonWidth, buttonHeight) then summonItem(1006663) end
+        
+        -- Row 8
+        if ImGui.Button('Nbane 4.5', buttonWidth, buttonHeight) then summonItem(1006684) end
+        ImGui.SameLine()
+        if ImGui.Button('Nshad 4.5', buttonWidth, buttonHeight) then summonItem(1006965) end
+        ImGui.SameLine()
+        if ImGui.Button('Elo S 4.5', buttonWidth, buttonHeight) then summonItem(1006665) end
+        ImGui.SameLine()
+        if ImGui.Button('Bram S 4.5', buttonWidth, buttonHeight) then summonItem(1006666) end
+        
+        -- Row 9
+        if ImGui.Button('Phen S 4.5', buttonWidth, buttonHeight) then summonItem(1006667) end
+        ImGui.SameLine()
+        if ImGui.Button('Prim S 4.5', buttonWidth, buttonHeight) then summonItem(1006668) end
+        ImGui.SameLine()
+        if ImGui.Button('Ward S 4.5', buttonWidth, buttonHeight) then summonItem(1006669) end
+        ImGui.SameLine()
+        if ImGui.Button('Veng 4.5', buttonWidth, buttonHeight) then summonItem(1006670) end
+    end
+
+    -- EPIC AUGMENTS - Collapsible (UPDATED WITH ALL RANKS)
+    if ImGui.CollapsingHeader('Epic Augments', ImGuiTreeNodeFlags.None) then
+        ImGui.Text('Base & Rank 1:')
+        if ImGui.Button('Base Aug', buttonWidth, buttonHeight) then summonItem(147513) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Rank 2 Augments:')
+        if ImGui.Button('Rk2 Base', buttonWidth, buttonHeight) then summonItem(147572) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk2 Range', buttonWidth, buttonHeight) then summonItem(147653) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk2 2Hand', buttonWidth, buttonHeight) then summonItem(147757) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Rank 3 Augments:')
+        if ImGui.Button('Rk3 Base', buttonWidth, buttonHeight) then summonItem(147656) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk3 Range', buttonWidth, buttonHeight) then summonItem(1006392) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk3 2Hand', buttonWidth, buttonHeight) then summonItem(147756) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Rank 4 Augments:')
+        if ImGui.Button('Rk4 Base', buttonWidth, buttonHeight) then summonItem(147719) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk4 Range', buttonWidth, buttonHeight) then summonItem(1006390) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk4 2Hand', buttonWidth, buttonHeight) then summonItem(147755) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Rank 5 Augments:')
+        if ImGui.Button('Rk5 Base', buttonWidth, buttonHeight) then summonItem(148230) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk5 Range', buttonWidth, buttonHeight) then summonItem(1006391) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk5 2Hand', buttonWidth, buttonHeight) then summonItem(148232) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Rank 6 Augments:')
+        if ImGui.Button('Rk6 Base', buttonWidth, buttonHeight) then summonItem(1006426) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk6 Range', buttonWidth, buttonHeight) then summonItem(1006428) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk6 2Hand', buttonWidth, buttonHeight) then summonItem(1006427) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Rank 7 Augments:')
+        if ImGui.Button('Rk7 Base', buttonWidth, buttonHeight) then summonItem(1006672) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk7 Range', buttonWidth, buttonHeight) then summonItem(1006671) end
+        ImGui.SameLine()
+        if ImGui.Button('Rk7 2Hand', buttonWidth, buttonHeight) then summonItem(1006673) end
+    end
+
+    -- NEW: EPIC BOOKS - Collapsible
+    if ImGui.CollapsingHeader('Epic Books', ImGuiTreeNodeFlags.None) then
+        ImGui.Text('Epic 4.5 Books (1-10):')
+        
+        -- Row 1: Books 1-4
+        if ImGui.Button('Book 1', buttonWidth, buttonHeight) then summonItem(1006687) end
+        ImGui.SameLine()
+        if ImGui.Button('Book 2', buttonWidth, buttonHeight) then summonItem(1006688) end
+        ImGui.SameLine()
+        if ImGui.Button('Book 3', buttonWidth, buttonHeight) then summonItem(1006689) end
+        ImGui.SameLine()
+        if ImGui.Button('Book 4', buttonWidth, buttonHeight) then summonItem(1006690) end
+        
+        -- Row 2: Books 5-8
+        if ImGui.Button('Book 5', buttonWidth, buttonHeight) then summonItem(1006691) end
+        ImGui.SameLine()
+        if ImGui.Button('Book 6', buttonWidth, buttonHeight) then summonItem(1006692) end
+        ImGui.SameLine()
+        if ImGui.Button('Book 7', buttonWidth, buttonHeight) then summonItem(1006693) end
+        ImGui.SameLine()
+        if ImGui.Button('Book 8', buttonWidth, buttonHeight) then summonItem(1006694) end
+        
+        -- Row 3: Books 9-10
+        if ImGui.Button('Book 9', buttonWidth, buttonHeight) then summonItem(1006695) end
+        ImGui.SameLine()
+        if ImGui.Button('Book 10', buttonWidth, buttonHeight) then summonItem(1006696) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Other Epic Books:')
+        
+        -- Row 4: Other Books
+        if ImGui.Button('Devas Bk', buttonWidth, buttonHeight) then summonItem(1006686) end
+        ImGui.SameLine()
+        if ImGui.Button('Power 3.0', buttonWidth, buttonHeight) then summonItem(147777) end
+        ImGui.SameLine()
+        if ImGui.Button('Chaxyl Bk', buttonWidth, buttonHeight) then summonItem(106428) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Epic Tokens & Items:')
+        
+        -- Row 5: Tokens
+        if ImGui.Button('Harness', buttonWidth, buttonHeight) then summonItem(147521) end
+        ImGui.SameLine()
+        if ImGui.Button('Conductor', buttonWidth, buttonHeight) then summonItem(147519) end
+        ImGui.SameLine()
+        if ImGui.Button('E 1.0 Tkn', buttonWidth, buttonHeight) then summonItem(147502) end
+        ImGui.SameLine()
+        if ImGui.Button('E 1.5 Enh', buttonWidth, buttonHeight) then summonItem(147512) end
+        
+        -- Row 6
+        if ImGui.Button('E 1.5 Tkn', buttonWidth, buttonHeight) then summonItem(147508) end
+        ImGui.SameLine()
+        if ImGui.Button('E 2.0 Tkn', buttonWidth, buttonHeight) then summonItem(147642) end
+    end
+
+    -- NEW: CURRENCY - Collapsible
+    if ImGui.CollapsingHeader('Currency', ImGuiTreeNodeFlags.None) then
+        ImGui.Text('Epic Gemstones:')
+        
+        if ImGui.Button('Devas Gem', buttonWidth, buttonHeight) then summonItem(1006674) end
+        ImGui.SameLine()
+        if ImGui.Button('Immor Gem', buttonWidth, buttonHeight) then summonItem(147592) end
+        
+        ImGui.Spacing()
+        ImGui.Text('Epic Stones:')
+        
+        if ImGui.Button('Sleep Stn', buttonWidth, buttonHeight) then summonItem(148258) end
+        ImGui.SameLine()
+        if ImGui.Button('Xorbb Stn', buttonWidth, buttonHeight) then summonItem(1006465) end
+        
+        ImGui.Spacing()
+        ImGui.Text('AA Advancement Tokens:')
+        
+        -- Row 1
+        if ImGui.Button('100 AA', buttonWidth, buttonHeight) then summonItem(147594) end
+        ImGui.SameLine()
+        if ImGui.Button('250 AA', buttonWidth, buttonHeight) then summonItem(147595) end
+        ImGui.SameLine()
+        if ImGui.Button('500 AA', buttonWidth, buttonHeight) then summonItem(147596) end
+        ImGui.SameLine()
+        if ImGui.Button('1K AA', buttonWidth, buttonHeight) then summonItem(147597) end
+        
+        -- Row 2
+        if ImGui.Button('10K AA', buttonWidth, buttonHeight) then summonItem(147758) end
+        ImGui.SameLine()
+        if ImGui.Button('50K AA', buttonWidth, buttonHeight) then summonItem(1006380) end
+    end
+
+    -- NON-VIS ITEMS - Collapsible
+    if ImGui.CollapsingHeader('Non-Visible Equipment', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('NonVis', buttonWidth, buttonHeight) then 
+            summonItem(98961)
+            summonItem(98988)
+            summonItem(98972)
+            summonItem(147558, 2)
+            summonItem(147629)
+            summonItem(147611)
+        end
+        ImGui.SameLine()
+        if ImGui.Button('Shroud', buttonWidth, buttonHeight) then summonItem(148257) end
+        ImGui.SameLine()
+        if ImGui.Button('Necklace', buttonWidth, buttonHeight) then summonItem(147977) end
+        ImGui.SameLine()
+        if ImGui.Button('Earring', buttonWidth, buttonHeight) then summonItem(147734) end
+    end
+
+    -- TIMEKEEPER ITEMS - Collapsible
+    if ImGui.CollapsingHeader('Timekeeper Items', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('TK Click', buttonWidth, buttonHeight) then 
+            summonItem(147639)
+            summonItem(147643)
+            summonItem(147641)
+            summonItem(1006376)
+        end
+        ImGui.SameLine()
+        if ImGui.Button('TK NonV', buttonWidth, buttonHeight) then 
+            summonItem(147611)
+            summonItem(147629)
+            summonItem(147734)
+            summonItem(147558, 2)
+            summonItem(148257)
+            summonItem(147977)
+        end
+        ImGui.SameLine()
+        if ImGui.Button('Fusion Arm', buttonWidth, buttonHeight) then 
+            summonItem(148262, 20)
+            summonItem(1006317, 20)
+            summonItem(1006316, 20)
+            summonItem(1006315, 20)
+            summonItem(1006318, 20)
+            summonItem(1006313, 20)
+            summonItem(1006314, 20)
+            summonItem(1006310, 20)
+        end
+        ImGui.SameLine()
+        if ImGui.Button('Fus Wpn', buttonWidth, buttonHeight) then summonItem(1006319, 20) end
+    end
+
+    -- TIMEKEEPER CREDITS - Collapsible
+    if ImGui.CollapsingHeader('Timekeeper Credits', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('50 Cred', buttonWidth, buttonHeight) then summonItem(147655, 20) end
+        ImGui.SameLine()
+        if ImGui.Button('500 Cred', buttonWidth, buttonHeight) then summonItem(1006373, 20) end
+        ImGui.SameLine()
+        if ImGui.Button('Both Cred', buttonWidth, buttonHeight) then 
+            summonItem(147655, 20)
+            summonItem(1006373, 20)
+        end
+    end
+
+    -- TIER COMPLETIONS - Collapsible
+    if ImGui.CollapsingHeader('Tier Completions', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('T2 Comp', buttonWidth, buttonHeight) then summonItem(147750) end
+        ImGui.SameLine()
+        if ImGui.Button('T3 Comp', buttonWidth, buttonHeight) then summonItem(147751) end
+        ImGui.SameLine()
+        if ImGui.Button('T4 Comp', buttonWidth, buttonHeight) then summonItem(147752) end
+        ImGui.SameLine()
+        if ImGui.Button('T5 Comp', buttonWidth, buttonHeight) then summonItem(147754) end
+
+        if ImGui.Button('T6 Comp', buttonWidth, buttonHeight) then summonItem(147753) end
+        ImGui.SameLine()
+        if ImGui.Button('T7 Comp', buttonWidth, buttonHeight) then summonItem(147749) end
+        ImGui.SameLine()
+        if ImGui.Button('T8 Comp', buttonWidth, buttonHeight) then summonItem(148242) end
+        ImGui.SameLine()
+        if ImGui.Button('All Comp', buttonWidth, buttonHeight) then 
+            summonItem(147750)
+            summonItem(147751)
+            summonItem(147752)
+            summonItem(147754)
+            summonItem(147753)
+            summonItem(147749)
+            summonItem(148242)
+        end
+    end
+
+    -- ASTRIAL WEAPONS - Collapsible
+    if ImGui.CollapsingHeader('Astrial Weapons', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Blade', buttonWidth, buttonHeight) then summonItem(1006320) end
+        ImGui.SameLine()
+        if ImGui.Button('Bow', buttonWidth, buttonHeight) then summonItem(1006327) end
+        ImGui.SameLine()
+        if ImGui.Button('Dagger', buttonWidth, buttonHeight) then summonItem(1006321) end
+        ImGui.SameLine()
+        if ImGui.Button('Gr Axe', buttonWidth, buttonHeight) then summonItem(1006325) end
+
+        if ImGui.Button('Gr Staff', buttonWidth, buttonHeight) then summonItem(1006326) end
+        ImGui.SameLine()
+        if ImGui.Button('Knuckles', buttonWidth, buttonHeight) then summonItem(1006323) end
+        ImGui.SameLine()
+        if ImGui.Button('Mace', buttonWidth, buttonHeight) then summonItem(1006322) end
+        ImGui.SameLine()
+        if ImGui.Button('Spear', buttonWidth, buttonHeight) then summonItem(1006328) end
+
+        if ImGui.Button('Wand', buttonWidth, buttonHeight) then summonItem(1006329) end
+        ImGui.SameLine()
+        if ImGui.Button('Infuse', buttonWidth, buttonHeight) then summonItem(1006513) end
+        ImGui.SameLine()
+        if ImGui.Button('Maj Infu', buttonWidth, buttonHeight) then summonItem(1006529) end
+        ImGui.SameLine()
+        if ImGui.Button('Gr Infus', buttonWidth, buttonHeight) then summonItem(1006528) end
+    end
+
+    -- FUSION WEAPONS - Collapsible
+    if ImGui.CollapsingHeader('Fusion Weapons', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Blunt Frc', buttonWidth, buttonHeight) then summonItem(1006324) end
+        ImGui.SameLine()
+        if ImGui.Button('Blunt Src', buttonWidth, buttonHeight) then summonItem(1006332) end
+        ImGui.SameLine()
+        if ImGui.Button('Dag Faith', buttonWidth, buttonHeight) then summonItem(1006336) end
+        ImGui.SameLine()
+        if ImGui.Button('Fist Spd', buttonWidth, buttonHeight) then summonItem(1006333) end
+
+        if ImGui.Button('Fist Pro', buttonWidth, buttonHeight) then summonItem(1006334) end
+        ImGui.SameLine()
+        if ImGui.Button('Ham Life', buttonWidth, buttonHeight) then summonItem(1006331) end
+        ImGui.SameLine()
+        if ImGui.Button('Slasher', buttonWidth, buttonHeight) then summonItem(1006319) end
+        ImGui.SameLine()
+        if ImGui.Button('Swd Battl', buttonWidth, buttonHeight) then summonItem(1006337) end
+
+        if ImGui.Button('Swd Conq', buttonWidth, buttonHeight) then summonItem(1006335) end
+        ImGui.SameLine()
+        if ImGui.Button('Shield', buttonWidth, buttonHeight) then summonItem(1006479) end
+        ImGui.SameLine()
+        if ImGui.Button('Gear Arm', buttonWidth, buttonHeight) then summonItem(1006504) end
+        ImGui.SameLine()
+        if ImGui.Button('Gear Sorc', buttonWidth, buttonHeight) then summonItem(1006505) end
+
+        if ImGui.Button('Guard Shd', buttonWidth, buttonHeight) then summonItem(1006433) end
+    end
+
+    -- AA POINTS - Collapsible
+    if ImGui.CollapsingHeader('AA Points', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('4k AA', buttonWidth, buttonHeight) then executeGMCommand('aapoints4k', false) end
+        ImGui.SameLine()
+        if ImGui.Button('100k AA', buttonWidth, buttonHeight) then executeGMCommand('aapoints100k', false) end
+        ImGui.SameLine()
+        if ImGui.Button('1M AA', buttonWidth, buttonHeight) then executeGMCommand('aapoints1M', false) end
+        ImGui.SameLine()
+        if ImGui.Button('100M AA', buttonWidth, buttonHeight) then executeGMCommand('aapoints100M', false) end
+    end
+end
+
+-- NEW: Render Global Player Commands Tab
+local function renderPlayerCommands()
+    ImGui.Text('Player: ' .. (mq.TLO.Me.Name() or 'Unknown'))
+    ImGui.Text('Zone: ' .. (mq.TLO.Zone.Name() or 'Unknown'))
+    ImGui.Spacing()
+
+    -- PLAYER BUFFS & UTILITIES - Collapsible
+    if ImGui.CollapsingHeader('Player Buffs & Utilities', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Buff Bot', buttonWidth, buttonHeight) then executeGMCommand('buffs', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Rem Buffs', buttonWidth, buttonHeight) then executeGMCommand('removebuffs', false) end
+        ImGui.Text('Target your pet and say "buffs" to buff it')
+    end
+
+    -- PLAYER FLAGS & PROGRESSION - Collapsible
+    if ImGui.CollapsingHeader('Player Flags & Progression', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('T1 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF1', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T2 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF2', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T3 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF3', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T4 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF4', false) end
+        
+        if ImGui.Button('T5 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF5', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T6 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF6', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T7 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF7', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T8 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF8', false) end
+        
+        if ImGui.Button('T9 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF9', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T10 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF10', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T11 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF11', false) end
+        ImGui.SameLine()
+        if ImGui.Button('T12 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF12', false) end
+        
+        if ImGui.Button('T13 Flag', buttonWidth, buttonHeight) then executeGMCommand('TierF13', false) end
+    end
+
+    -- ANTI-WARP SYSTEM - Collapsible
+    if ImGui.CollapsingHeader('Anti-Warp System', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Enable AW', buttonWidth, buttonHeight) then executeGMCommand('antiwarp on', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Disable AW', buttonWidth, buttonHeight) then executeGMCommand('antiwarp off', false) end
+        ImGui.Text('Anti-Warp: Prevents teleport hacking')
+        ImGui.Text('Monitors player movement and returns to last')
+        ImGui.Text('valid position if warp/speed hack detected')
+    end
+
+    -- COSMETIC CHANGES - Collapsible
+    if ImGui.CollapsingHeader('Cosmetic Changes', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Set Race', buttonWidth, buttonHeight) then executeGMCommand('setrace ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Set Size', buttonWidth, buttonHeight) then executeGMCommand('setsize ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Set Gender', buttonWidth, buttonHeight) then executeGMCommand('setgender ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Reset Look', buttonWidth, buttonHeight) then executeGMCommand('resetlook', false) end
+        
+        ImGui.Text('Cosmetic changes persist through zoning')
+    end
+end
+
+-- NEW: Render Global NPC Commands Tab
+local function renderNPCCommands()
+    ImGui.Text('Player: ' .. (mq.TLO.Me.Name() or 'Unknown'))
+    ImGui.Text('Zone: ' .. (mq.TLO.Zone.Name() or 'Unknown'))
+    ImGui.Spacing()
+
+    -- NPC LOOT CONTROL - Collapsible
+    if ImGui.CollapsingHeader('NPC Loot Control', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Show Loot', buttonWidth, buttonHeight) then executeGMCommand('showloot', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Loot Table', buttonWidth, buttonHeight) then executeGMCommand('loottable ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Add Loot', buttonWidth, buttonHeight) then executeGMCommand('addloot ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('Clear Loot', buttonWidth, buttonHeight) then executeGMCommand('clearloot', false) end
+        
+        ImGui.Text('Tier-based loot automatically added on spawn')
+        ImGui.Text('AA Stones, Gems, Bear Spray, etc.')
+    end
+
+    -- NPC STATS & SCALING - Collapsible
+    if ImGui.CollapsingHeader('NPC Stats & Scaling', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('NPC Stats', buttonWidth, buttonHeight) then executeGMCommand('npcstats', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Edit Stats', buttonWidth, buttonHeight) then executeGMCommand('npceditstats', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Scale NPC', buttonWidth, buttonHeight) then executeGMCommand('scalenpc ', true) end
+        ImGui.SameLine()
+        if ImGui.Button('NPC Level', buttonWidth, buttonHeight) then executeGMCommand('npclevel ', true) end
+        
+        ImGui.Text('NPC stats scale based on zone/tier')
+    end
+
+    -- PET POWER SYSTEM - Collapsible
+    if ImGui.CollapsingHeader('Pet Power System', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Pet Hail', buttonWidth, buttonHeight) then executeGMCommand('hail', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Pet Stats', buttonWidth, buttonHeight) then executeGMCommand('mystats', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Pet Weapon', buttonWidth, buttonHeight) then executeGMCommand('weapon', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Pet Buffs', buttonWidth, buttonHeight) then executeGMCommand('buffs', false) end
+        
+        ImGui.Text('Target your pet and use these commands')
+        ImGui.Text('Pet power scales with tier progression')
+    end
+
+    -- EVENT SPAWNS - Collapsible
+    if ImGui.CollapsingHeader('Event Spawns', ImGuiTreeNodeFlags.None) then
+        if ImGui.Button('Xmas On', buttonWidth, buttonHeight) then executeGMCommand('christmas on', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Xmas Off', buttonWidth, buttonHeight) then executeGMCommand('christmas off', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Halloween', buttonWidth, buttonHeight) then executeGMCommand('halloween toggle', false) end
+        ImGui.SameLine()
+        if ImGui.Button('Turkey', buttonWidth, buttonHeight) then executeGMCommand('thanksgiving toggle', false) end
+        
+        ImGui.Text('Holiday events spawn special NPCs on kill')
+        ImGui.Text('Angry Santa (Xmas), Turkeytron, etc.')
+        ImGui.Text('2% spawn chance when XTarget < 4')
+    end
+end
+
+local function renderDevTools()
+    -- Apply theme colors
+    applyTheme()
+    
+    -- Push style for button spacing and rounding
+    ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, 8, 8)
+    ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 6)
+    ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 8)
+    
+    openGUI, showUI = ImGui.Begin('EQEmu Dev Command Master', openGUI)
+
+    if showUI then
+        -- Tab Bar
+        if ImGui.BeginTabBar('DevToolsTabs') then
+            -- Main Dev Console Tab
+            if ImGui.BeginTabItem('Main Dev Console') then
+                currentTab = 1
+                renderMainDevConsole()
+                ImGui.EndTabItem()
+            end
+            
+            -- Quest NPC Testing Tab
+            if ImGui.BeginTabItem('Quest NPC Testing') then
+                currentTab = 2
+                renderQuestNPCTesting()
+                ImGui.EndTabItem()
+            end
+            
+            -- GM Items & Flags Tab
+            if ImGui.BeginTabItem('GM Items & Flags') then
+                currentTab = 3
+                renderGMItemsFlags()
+                ImGui.EndTabItem()
+            end
+            
+            -- NEW: Global Player Commands Tab
+            if ImGui.BeginTabItem('Player Commands') then
+                currentTab = 4
+                renderPlayerCommands()
+                ImGui.EndTabItem()
+            end
+            
+            -- NEW: Global NPC Commands Tab
+            if ImGui.BeginTabItem('NPC Commands') then
+                currentTab = 5
+                renderNPCCommands()
+                ImGui.EndTabItem()
+            end
+            
+            ImGui.EndTabBar()
+        end
+        
+        -- Process spawn queue every frame
+        processSpawnQueue()
+    end
+
+    ImGui.End()
+    
+    -- Pop the style vars for spacing and rounding
+    ImGui.PopStyleVar(3)
+    
+    -- Pop all the style colors AFTER the End call
+    ImGui.PopStyleColor(12)
+    
+    -- Render confirmation dialog if needed
+    renderConfirmDialog()
+    
+    if not openGUI then
+        return
+    end
+end
+
+mq.imgui.init('devtools', renderDevTools)
+
+while openGUI do
+    mq.delay(500)
+end

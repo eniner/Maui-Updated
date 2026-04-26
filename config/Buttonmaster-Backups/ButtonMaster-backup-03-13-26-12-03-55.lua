@@ -1,0 +1,85 @@
+return {
+	['Sets'] = {
+		['Movement'] = {
+			[1] = 'Button_4',
+		},
+		['Primary'] = {
+			[1] = 'Button_1',
+			[2] = 'Button_2',
+			[3] = 'Button_3',
+		},
+	},
+	['LastBackup'] = 1773417835,
+	['Version'] = 7,
+	['Characters'] = {
+		['E9 Profusion_Enine'] = {
+			['Windows'] = {
+				[1] = {
+					['ButtonSize'] = 6,
+					['CompactMode'] = false,
+					['FPS'] = 0,
+					['Visible'] = true,
+					['PerCharacterPositioning'] = false,
+					['Width'] = 344,
+					['Height'] = 377,
+					['Locked'] = false,
+					['Pos'] = {
+						['x'] = 61,
+						['y'] = 60,
+					},
+					['Sets'] = {
+						[1] = 'Primary',
+						[2] = 'Movement',
+					},
+					['Theme'] = 'UltimateEQAssist',
+					['HideScrollbar'] = false,
+					['HideTitleBar'] = false,
+					['AdvTooltips'] = true,
+					['Font'] = 10,
+				},
+			},
+		},
+	},
+	['Buttons'] = {
+		['Button_1'] = {
+			['CachedCountDown'] = 0,
+			['CachedCoolDownTimer'] = 0,
+			['CachedLastRan'] = 19871.844999999998,
+			['labelMidX'] = 15,
+			['labelMidY'] = 14,
+			['CachedToggleLocked'] = false,
+			['Cmd'] = '/bcaa //burn\n/timed 500 /bcaa //burn',
+			['Label'] = 'Burn (all)',
+		},
+		['Button_2'] = {
+			['CachedCountDown'] = 0,
+			['CachedCoolDownTimer'] = 0,
+			['CachedLastRan'] = 19871.844999999998,
+			['labelMidX'] = 10,
+			['labelMidY'] = 14,
+			['CachedToggleLocked'] = false,
+			['Cmd'] = '/bcaa //multi ; /twist off ; /mqp on',
+			['Label'] = 'Pause (all)',
+		},
+		['Button_3'] = {
+			['CachedCountDown'] = 0,
+			['CachedCoolDownTimer'] = 0,
+			['CachedLastRan'] = 19871.844999999998,
+			['labelMidX'] = 2,
+			['labelMidY'] = 14,
+			['CachedToggleLocked'] = false,
+			['Cmd'] = '/bcaa //mqp off',
+			['Label'] = 'Unpause (all)',
+		},
+		['Button_4'] = {
+			['CachedCountDown'] = 0,
+			['CachedCoolDownTimer'] = 0,
+			['CachedLastRan'] = 19863.191,
+			['labelMidX'] = 9,
+			['labelMidY'] = 6,
+			['CachedToggleLocked'] = false,
+			['Cmd'] = '/bca //nav id ${Target.ID}',
+			['Label'] = 'Nav Target (bca)',
+		},
+	},
+}

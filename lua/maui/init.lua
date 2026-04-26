@@ -94,6 +94,7 @@ local integrationAutoSync = true
 local integrationStatusCache = {}
 local integrationStatusNextRefresh = 0
 local integrationStatusRefreshMs = 500
+local pendingLuaConsoleRestartAt = nil
 local actionCooldowns = {
     memspells = 1.0,
     savegems = 1.0,
@@ -110,10 +111,19 @@ local actionCooldowns = {
 
 local tloCache = cache:new(300, 300)
 
-globals.MyServer = mq.TLO.EverQuest.Server() or 'Unknown' -- UPDATED: nil-safe TLO read during transient load/zoning states
-globals.MyName = mq.TLO.Me.CleanName() or 'Unknown' -- UPDATED: nil-safe TLO read during transient load/zoning states
-globals.MyLevel = tonumber(mq.TLO.Me.Level() or 1) or 1 -- UPDATED: enforce numeric level with safe fallback
-globals.MyClass = tostring(mq.TLO.Me.Class.ShortName() or 'unk'):lower() -- UPDATED: nil-safe class short name normalization
+local SafeTLOCall
+SafeTLOCall = function(fn, default)
+    local ok, value = pcall(fn)
+    if ok and value ~= nil then
+        return value
+    end
+    return default
+end
+
+globals.MyServer = SafeTLOCall(function() return mq.TLO.EverQuest.Server() end, 'Unknown') -- UPDATED: nil-safe TLO read during transient load/zoning states
+globals.MyName = SafeTLOCall(function() return mq.TLO.Me.CleanName() end, 'Unknown') -- UPDATED: nil-safe TLO read during transient load/zoning states
+globals.MyLevel = tonumber(SafeTLOCall(function() return mq.TLO.Me.Level() end, 1) or 1) or 1 -- UPDATED: enforce numeric level with safe fallback
+globals.MyClass = tostring(SafeTLOCall(function() return mq.TLO.Me.Class.ShortName() end, 'unk') or 'unk'):lower() -- UPDATED: nil-safe class short name normalization
 
 globals.MAUI_INI = ('%s/%s_%s.ini'):format(mq.configDir, globals.MyServer, globals.MyName)
 local maui_ini_key = 'MAUI'
@@ -545,17 +555,22 @@ local function HandleUnsavedActionConfirm()
 end
 
 local function Save()
+    if type(globals.Config) ~= 'table' then
+        globals.Config = {}
+    end
     -- Set "NULL" string values to nil so they aren't saved
     for sectionName,sectionProperties in pairs(globals.Config) do
-        for key,value in pairs(sectionProperties) do
-            if value == 'NULL' then
-                -- Replace and XYZCond#=FALSE with nil as well if no corresponding XYZ# value
-                local word = string.match(key, '[^%d]+')
-                local number = string.match(key, '%d+')
-                if number then
-                    globals.Config[sectionName][word..'Cond'..number] = nil
+        if type(sectionProperties) == 'table' then
+            for key,value in pairs(sectionProperties) do
+                if value == 'NULL' then
+                    -- Replace and XYZCond#=FALSE with nil as well if no corresponding XYZ# value
+                    local word = string.match(key, '[^%d]+')
+                    local number = string.match(key, '%d+')
+                    if number then
+                        globals.Config[sectionName][word..'Cond'..number] = nil
+                    end
+                    globals.Config[sectionName][key] = nil
                 end
-                globals.Config[sectionName][key] = nil
             end
         end
     end
@@ -577,8 +592,11 @@ local SpellSorter = function(a, b)
 end
 
 local function AddSpellToMap(spell)
-    local cat = spell.Category()
-    local subcat = spell.Subcategory()
+    if not spell or not spell() then return end
+    local cat = SafeTLOCall(function() return spell.Category() end, 'Unknown')
+    local subcat = SafeTLOCall(function() return spell.Subcategory() end, 'General')
+    local spellName = SafeTLOCall(function() return spell.Name() end, '')
+    if spellName == '' then return end
     if not spells[cat] then
         spells[cat] = {subcategories={}}
         table.insert(spells.categories, cat)
@@ -588,8 +606,8 @@ local function AddSpellToMap(spell)
         table.insert(spells[cat].subcategories, subcat)
     end
     --if spell.Level() >= globals.MyLevel-30 then
-        local name = spell.Name():gsub(' Rk%..*', '')
-        table.insert(spells[cat][subcat], {spell.Level(), name, spell.Name()})
+        local name = spellName:gsub(' Rk%..*', '')
+        table.insert(spells[cat][subcat], {SafeTLOCall(function() return spell.Level() end, 0), name, spellName})
     --end
 end
 
@@ -621,17 +639,20 @@ local function InitSpellTree()
 end
 
 local function AddAAToMap(aa)
-    local type = aatypes[aa.Type()]
-    if not type then return end  -- FIX 13a: guard against unknown AA type index
-    if not altAbilities[type] then
-        altAbilities[type] = {}
-        table.insert(altAbilities.types, type)
+    if not aa or not aa() then return end
+    local aaType = aatypes[SafeTLOCall(function() return aa.Type() end, nil)]
+    if not aaType then return end  -- FIX 13a: guard against unknown AA type index
+    if not altAbilities[aaType] then
+        altAbilities[aaType] = {}
+        table.insert(altAbilities.types, aaType)
     end
     -- FIX 13b: aa.Spell.Name() chains through an unevaluated TLO intermediate.
     -- Must evaluate aa.Spell() first, then get Name() from the spell object.
     local spellObj = aa.Spell
-    local spellName = (spellObj and spellObj() and spellObj.Name()) or ''
-    table.insert(altAbilities[type], {aa.Name(), spellName})
+    local spellName = (spellObj and spellObj() and SafeTLOCall(function() return spellObj.Name() end, '')) or ''
+    local aaName = SafeTLOCall(function() return aa.Name() end, '')
+    if aaName == '' then return end
+    table.insert(altAbilities[aaType], {aaName, spellName})
 end
 
 local function InitAATree()
@@ -654,8 +675,11 @@ local function InitAATree()
 end
 
 local function AddDiscToMap(disc)
-    local cat = disc.Category()
-    local subcat = disc.Subcategory()
+    if not disc or not disc() then return end
+    local cat = SafeTLOCall(function() return disc.Category() end, 'Unknown')
+    local subcat = SafeTLOCall(function() return disc.Subcategory() end, 'General')
+    local discName = SafeTLOCall(function() return disc.Name() end, '')
+    if discName == '' then return end
     if not discs[cat] then
         discs[cat] = {subcategories={}}
         table.insert(discs.categories, cat)
@@ -664,8 +688,8 @@ local function AddDiscToMap(disc)
         discs[cat][subcat] = {}
         table.insert(discs[cat].subcategories, subcat)
     end
-    local name = disc.Name():gsub(' Rk%..*', '')
-    table.insert(discs[cat][subcat], {disc.Level(), name, disc.Name()})
+    local name = discName:gsub(' Rk%..*', '')
+    table.insert(discs[cat][subcat], {SafeTLOCall(function() return disc.Level() end, 0), name, discName})
 end
 
 local function InitDiscTree()
@@ -692,18 +716,21 @@ local function GetSpellUpgrade(targetType, subCat, numEffects, minLevel)
     for i=1,1120 do
         local valid = true
         local spell = mq.TLO.Me.Book(i)
-        if not spell.ID() then
+        if not spell or not spell() then
             valid = false
-        elseif spell.Subcategory() ~= subCat then
+        elseif not SafeTLOCall(function() return spell.ID() end, nil) then
             valid = false
-        elseif spell.TargetType() ~= targetType then
+        elseif SafeTLOCall(function() return spell.Subcategory() end, nil) ~= subCat then
             valid = false
-        elseif spell.NumEffects() ~= numEffects then
+        elseif SafeTLOCall(function() return spell.TargetType() end, nil) ~= targetType then
             valid = false
-        elseif spell.Level() <= minLevel then
+        elseif SafeTLOCall(function() return spell.NumEffects() end, nil) ~= numEffects then
+            valid = false
+        elseif (SafeTLOCall(function() return spell.Level() end, 0) or 0) <= minLevel then
             valid = false
         end
         if valid then
+            local okUpgrade = pcall(function()
             -- TODO: several trigger spells i don't think this would handle properly...
             -- 470 == trigger best in spell group
             -- 374 == trigger spell
@@ -749,6 +776,10 @@ local function GetSpellUpgrade(targetType, subCat, numEffects, minLevel)
                     end
                 end
             end
+            end)
+            if not okUpgrade then
+                maxName = maxName or ''
+            end
         end
     end
     return maxName
@@ -758,7 +789,7 @@ end
 
 -- Color spell names in spell picker similar to the spell bar context menus
 local function SetSpellTextColor(spell)
-    local target = tloCache:get(spell..'.targettype', function() return mq.TLO.Spell(spell).TargetType() end)
+    local target = tloCache:get(spell..'.targettype', function() return SafeTLOCall(function() return mq.TLO.Spell(spell).TargetType() end, nil) end)
     if target == 'Single' or target == 'Line of Sight' or target == 'Undead' then
         ImGui.PushStyleColor(ImGuiCol.Text, 1, 0, 0, 1)
     elseif target == 'Self' then
@@ -786,12 +817,16 @@ local memspell = nil
 local memgem = 0
 local memQueue = {}
 
-local function SafeTLOCall(fn, default)
-    local ok, value = pcall(fn)
-    if ok and value ~= nil then
-        return value
+local function CursorAttachmentType()
+    return SafeTLOCall(function() return mq.TLO.CursorAttachment.Type() end, '')
+end
+
+local function CursorAttachmentName(kind)
+    if kind == 'ITEM' then
+        return SafeTLOCall(function() return mq.TLO.CursorAttachment.Item.Name() end, nil)
+    elseif kind == 'SPELL_GEM' then
+        return SafeTLOCall(function() return mq.TLO.CursorAttachment.Spell.Name() end, nil)
     end
-    return default
 end
 
 local function BuildClickyItemLists()
@@ -1077,9 +1112,9 @@ local function DrawSpellPicker(sectionName, key, index)
             end
         end
         if valueParts[1] then
-            local rankname = tloCache:get(valueParts[1]..'.rankname', function() return mq.TLO.Spell(valueParts[1]).RankName() end)
+            local rankname = tloCache:get(valueParts[1]..'.rankname', function() return SafeTLOCall(function() return mq.TLO.Spell(valueParts[1]).RankName() end, nil) end)
             if rankname then
-                local bookidx = tloCache:get('book.'..rankname, function() return mq.TLO.Me.Book(rankname)() end)
+                local bookidx = tloCache:get('book.'..rankname, function() return SafeTLOCall(function() return mq.TLO.Me.Book(rankname)() end, nil) end)
                 if bookidx then
                     if ImGui.MenuItem('Memorize Spell') then
                         for i=1,13 do
@@ -1105,10 +1140,15 @@ local function DrawSelectedSpellUpgradeButton(spell)
     local upgradeValue = nil
     -- Avoid finding the upgrade more than once
     if not selectedUpgrade then
-        selectedUpgrade = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), spell.Level())
+        selectedUpgrade = GetSpellUpgrade(
+            SafeTLOCall(function() return spell.TargetType() end, nil),
+            SafeTLOCall(function() return spell.Subcategory() end, nil),
+            SafeTLOCall(function() return spell.NumEffects() end, nil),
+            SafeTLOCall(function() return spell.Level() end, 0)
+        )
     end
     -- Upgrade found? display the upgrade button
-    if selectedUpgrade ~= '' and selectedUpgrade ~= spell.Name() then
+    if selectedUpgrade ~= '' and selectedUpgrade ~= SafeTLOCall(function() return spell.Name() end, '') then
         if ImGui.Button('Upgrade Available - '..selectedUpgrade) then
             upgradeValue = selectedUpgrade
             selectedUpgrade = nil
@@ -1121,10 +1161,15 @@ local function DrawSelectedSpellDowngradeButton(spell)
     local upgradeValue = nil
     -- Avoid finding the upgrade more than once
     if not selectedUpgrade then
-        selectedUpgrade = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), 0)
+        selectedUpgrade = GetSpellUpgrade(
+            SafeTLOCall(function() return spell.TargetType() end, nil),
+            SafeTLOCall(function() return spell.Subcategory() end, nil),
+            SafeTLOCall(function() return spell.NumEffects() end, nil),
+            0
+        )
     end
     -- Upgrade found? display the upgrade button
-    if selectedUpgrade ~= '' and selectedUpgrade ~= spell.Name() then
+    if selectedUpgrade ~= '' and selectedUpgrade ~= SafeTLOCall(function() return spell.Name() end, '') then
         if ImGui.Button('Downgrade Available - '..selectedUpgrade) then
             upgradeValue = selectedUpgrade
             selectedUpgrade = nil
@@ -1186,7 +1231,8 @@ local function DrawSelectedListItem(sectionName, key, value)
     -- Previously, if valueParts[1] was empty or invalid, spell could be a non-nil
     -- userdata with no valid data, causing spell.RankName() to error or return garbage.
     if spell and spell() then
-        if mq.TLO.Me.Book(spell.RankName())() then
+        local rankName = SafeTLOCall(function() return spell.RankName() end, nil)
+        if rankName and SafeTLOCall(function() return mq.TLO.Me.Book(rankName)() end, nil) then
             local upgradeResult = DrawSelectedSpellUpgradeButton(spell)
             if upgradeResult then valueParts[1] = upgradeResult end
         else
@@ -1209,19 +1255,19 @@ local function DrawPlainListButton(sectionName, key, listIdx, iconSize)
     -- INI value is set to non-spell/item
     if ImGui.Button(listIdx..'##'..sectionName..key, iconSize[1], iconSize[2]) then
         if type(listIdx) == 'number' then
-            if mq.TLO.CursorAttachment.Type() == 'ITEM' then
-                globals.Config[sectionName][key..listIdx] = mq.TLO.CursorAttachment.Item.Name()
-            elseif mq.TLO.CursorAttachment.Type() == 'SPELL_GEM' then
-                globals.Config[sectionName][key..listIdx] = mq.TLO.CursorAttachment.Spell.Name()
+            local cursorType = CursorAttachmentType()
+            local cursorName = CursorAttachmentName(cursorType)
+            if cursorName and (cursorType == 'ITEM' or cursorType == 'SPELL_GEM') then
+                globals.Config[sectionName][key..listIdx] = cursorName
             else
                 selectedListItem = {key, listIdx}
                 selectedUpgrade = nil
             end
         else
-            if mq.TLO.CursorAttachment.Type() == 'ITEM' then
-                globals.Config[sectionName][key] = mq.TLO.CursorAttachment.Item.Name()
-            elseif mq.TLO.CursorAttachment.Type() == 'SPELL_GEM' then
-                globals.Config[sectionName][key] = mq.TLO.CursorAttachment.Spell.Name()
+            local cursorType = CursorAttachmentType()
+            local cursorName = CursorAttachmentName(cursorType)
+            if cursorName and (cursorType == 'ITEM' or cursorType == 'SPELL_GEM') then
+                globals.Config[sectionName][key] = cursorName
             end
         end
     elseif type(listIdx) == 'number' then
@@ -1251,20 +1297,20 @@ local function CharacterHasThing(iniValue)
     elseif tloCache:get('invalid.'..iniValue) then
         valid = false
     else
-        local rankname = tloCache:get(iniValue..'.rankname', function() return mq.TLO.Spell(iniValue).RankName() end)
+        local rankname = tloCache:get(iniValue..'.rankname', function() return SafeTLOCall(function() return mq.TLO.Spell(iniValue).RankName() end, nil) end)
         if rankname then
-            if tloCache:get('book.'..rankname, function() return mq.TLO.Me.Book(rankname)() end) then
+            if tloCache:get('book.'..rankname, function() return SafeTLOCall(function() return mq.TLO.Me.Book(rankname)() end, nil) end) then
                 valid = true
-            elseif tloCache:get('aa.'..iniValue, function() return mq.TLO.Me.AltAbility(iniValue)() end) then
+            elseif tloCache:get('aa.'..iniValue, function() return SafeTLOCall(function() return mq.TLO.Me.AltAbility(iniValue)() end, nil) end) then
                 valid = true
-            elseif tloCache:get('disc.'..rankname, function() return mq.TLO.Me.CombatAbility(rankname)() end) then
+            elseif tloCache:get('disc.'..rankname, function() return SafeTLOCall(function() return mq.TLO.Me.CombatAbility(rankname)() end, nil) end) then
                 valid = true
             end
-        elseif tloCache:get('item.'..iniValue, function() return mq.TLO.FindItem(iniValue)() end) then
+        elseif tloCache:get('item.'..iniValue, function() return SafeTLOCall(function() return mq.TLO.FindItem(iniValue)() end, nil) end) then
             valid = true
         elseif iniValue:find('command:') or iniValue:find('${') then
             valid = true
-        elseif tloCache:get('ability.'..iniValue, function() return mq.TLO.Me.Ability(iniValue)() end) then
+        elseif tloCache:get('ability.'..iniValue, function() return SafeTLOCall(function() return mq.TLO.Me.Ability(iniValue)() end, nil) end) then
             valid = true
         else
             tloCache:get('invalid.'..iniValue, function() return 1 end)
@@ -1285,25 +1331,32 @@ local function ResolveBestAbilityName(rawName, mode)
     if name:find('command:') or name:find('${') then return nil end
 
     -- Keep already-valid non-spell entries untouched.
-    if mq.TLO.FindItem(name)() or mq.TLO.Me.AltAbility(name)() or mq.TLO.Me.Ability(name)() then
+    if SafeTLOCall(function() return mq.TLO.FindItem(name)() end, nil)
+        or SafeTLOCall(function() return mq.TLO.Me.AltAbility(name)() end, nil)
+        or SafeTLOCall(function() return mq.TLO.Me.Ability(name)() end, nil) then
         return nil
     end
-    if mq.TLO.Me.CombatAbility(name)() then
+    if SafeTLOCall(function() return mq.TLO.Me.CombatAbility(name)() end, nil) then
         return nil
     end
 
     local spell = mq.TLO.Spell(name)
     if spell() then
-        local rankName = spell.RankName()
-        if rankName and mq.TLO.Me.CombatAbility(rankName)() then
+        local rankName = SafeTLOCall(function() return spell.RankName() end, nil)
+        if rankName and SafeTLOCall(function() return mq.TLO.Me.CombatAbility(rankName)() end, nil) then
             return rankName
         end
-        local knownSpell = rankName and mq.TLO.Me.Book(rankName)()
+        local knownSpell = rankName and SafeTLOCall(function() return mq.TLO.Me.Book(rankName)() end, nil)
         local minLevel = 0
         if mode == 'upgrade' and knownSpell then
-            minLevel = spell.Level()
+            minLevel = SafeTLOCall(function() return spell.Level() end, 0)
         end
-        local replacement = GetSpellUpgrade(spell.TargetType(), spell.Subcategory(), spell.NumEffects(), minLevel)
+        local replacement = GetSpellUpgrade(
+            SafeTLOCall(function() return spell.TargetType() end, nil),
+            SafeTLOCall(function() return spell.Subcategory() end, nil),
+            SafeTLOCall(function() return spell.NumEffects() end, nil),
+            minLevel
+        )
         if replacement and replacement ~= '' and replacement ~= name then
             return replacement
         end
@@ -1312,12 +1365,19 @@ local function ResolveBestAbilityName(rawName, mode)
     -- Fallback: strip explicit rank suffixes and retry disc/AA/spell name.
     local baseName = name:gsub(' Rk%..*', '')
     if baseName ~= name then
-        if mq.TLO.Me.CombatAbility(baseName)() or mq.TLO.Me.AltAbility(baseName)() or mq.TLO.Me.Ability(baseName)() then
+        if SafeTLOCall(function() return mq.TLO.Me.CombatAbility(baseName)() end, nil)
+            or SafeTLOCall(function() return mq.TLO.Me.AltAbility(baseName)() end, nil)
+            or SafeTLOCall(function() return mq.TLO.Me.Ability(baseName)() end, nil) then
             return baseName
         end
         local baseSpell = mq.TLO.Spell(baseName)
         if baseSpell() then
-            local replacement = GetSpellUpgrade(baseSpell.TargetType(), baseSpell.Subcategory(), baseSpell.NumEffects(), 0)
+            local replacement = GetSpellUpgrade(
+                SafeTLOCall(function() return baseSpell.TargetType() end, nil),
+                SafeTLOCall(function() return baseSpell.Subcategory() end, nil),
+                SafeTLOCall(function() return baseSpell.NumEffects() end, nil),
+                0
+            )
             if replacement and replacement ~= '' and replacement ~= name then
                 return replacement
             end
@@ -1349,8 +1409,8 @@ local function QueueMemSpell(gemIdx, spellName, queue)
     if not spellBase or spellBase == '' or spellBase:upper() == 'NULL' then return false end
     local spell = mq.TLO.Spell(spellBase)
     if not spell() then return false end
-    local rankName = spell.RankName()
-    if not rankName or not mq.TLO.Me.Book(rankName)() then return false end
+    local rankName = SafeTLOCall(function() return spell.RankName() end, nil)
+    if not rankName or not SafeTLOCall(function() return mq.TLO.Me.Book(rankName)() end, nil) then return false end
     table.insert(queue, {gem = gemIdx, spell = rankName})
     return true
 end
@@ -1439,25 +1499,25 @@ local function DrawSpellIconOrButton(sectionName, key, index)
         -- Use first part of INI value as spell or item name to lookup icon
         if tloCache:get('invalid.'..iniValue) then
             DrawPlainListButton(sectionName, key, index, iconSize)
-        elseif tloCache:get(iniValue..'.name', function() return mq.TLO.Spell(iniValue)() end) then
+        elseif tloCache:get(iniValue..'.name', function() return SafeTLOCall(function() return mq.TLO.Spell(iniValue)() end, nil) end) then
             -- Need to create a group for drag/drop to work, doesn't seem to work with just the texture animation?
             ImGui.BeginGroup()
             local x,y = ImGui.GetCursorPos()
             ImGui.Button('##'..index..sectionName..key, iconSize[1], iconSize[2])
             ImGui.SetCursorPosX(x)
             ImGui.SetCursorPosY(y)
-            local spellIcon = tloCache:get(iniValue..'.spellicon', function() return mq.TLO.Spell(iniValue).SpellIcon() end)
+            local spellIcon = tloCache:get(iniValue..'.spellicon', function() return SafeTLOCall(function() return mq.TLO.Spell(iniValue).SpellIcon() end, nil) end)
             animSpellIcons:SetTextureCell(spellIcon)
             ImGui.DrawTextureAnimation(animSpellIcons, iconSize[1], iconSize[2])
             ImGui.EndGroup()
-        elseif tloCache:get('item.'..iniValue, function() return mq.TLO.FindItem(iniValue)() end) then
+        elseif tloCache:get('item.'..iniValue, function() return SafeTLOCall(function() return mq.TLO.FindItem(iniValue)() end, nil) end) then
             -- Need to create a group for drag/drop to work, doesn't seem to work with just the texture animation?
             ImGui.BeginGroup()
             local x,y = ImGui.GetCursorPos()
             ImGui.Button('##'..index..sectionName..key, iconSize[1], iconSize[2])
             ImGui.SetCursorPosX(x)
             ImGui.SetCursorPosY(y)
-            local itemIcon = tloCache:get('itemicon.'..iniValue, function() return mq.TLO.FindItem(iniValue).Icon() end)
+            local itemIcon = tloCache:get('itemicon.'..iniValue, function() return SafeTLOCall(function() return mq.TLO.FindItem(iniValue).Icon() end, nil) end)
             animItems:SetTextureCell(itemIcon-500)
             ImGui.DrawTextureAnimation(animItems, iconSize[1], iconSize[2])
             ImGui.EndGroup()
@@ -1476,10 +1536,10 @@ local function DrawSpellIconOrButton(sectionName, key, index)
             end
             ImGui.EndDragDropTarget()
         elseif ImGui.IsItemHovered() and ImGui.IsMouseReleased(0) and type(index) == 'number' then
-            if mq.TLO.CursorAttachment.Type() == 'ITEM' then
-                globals.Config[sectionName][key..index] = mq.TLO.CursorAttachment.Item.Name()
-            elseif mq.TLO.CursorAttachment.Type() == 'SPELL_GEM' then
-                globals.Config[sectionName][key..index] = mq.TLO.CursorAttachment.Spell.Name()
+            local cursorType = CursorAttachmentType()
+            local cursorName = CursorAttachmentName(cursorType)
+            if cursorName and (cursorType == 'ITEM' or cursorType == 'SPELL_GEM') then
+                globals.Config[sectionName][key..index] = cursorName
             else
                 selectedListItem = {key, index}
                 selectedUpgrade = nil
@@ -1709,6 +1769,13 @@ end
 
 -- Draw an INI section tab
 local function DrawSection(sectionName, sectionProperties)
+    if type(globals.Config) ~= 'table' then
+        globals.Config = {}
+    end
+    if type(sectionProperties) ~= 'table' then
+        ImGui.TextColored(1, 0.35, 0.35, 1, string.format('Missing schema section: %s', tostring(sectionName)))
+        return
+    end
     if sectionName == 'Buffs' then
         useRankNames = true
     end
@@ -2022,11 +2089,12 @@ local function DrawUltimateBottomBar()
     end
 
     local function GetMacroStatus()
-        local macro = mq.TLO.Macro() -- UPDATED: cache TLO handle once for nil-safe access
-        if not macro or macro.Name() ~= 'muleassist.mac' then -- UPDATED: nil-safe macro existence/name check
+        local macro = mq.TLO.Macro
+        local macroName = SafeTLOCall(function() return macro.Name() end, nil)
+        if macroName ~= 'muleassist.mac' then
             return 'STOPPED', {1.00, 0.35, 0.35, 1.0}
         end
-        if macro.Paused() then -- UPDATED: use cached macro handle for paused-state check
+        if SafeTLOCall(function() return macro.Paused() end, false) then
             return 'PAUSED', {1.00, 0.85, 0.20, 1.0}
         end
         return 'RUNNING', {0.30, 1.00, 0.45, 1.0}
@@ -3436,6 +3504,9 @@ local function DrawReadmeTab()
 end
 
 local function DrawField(sectionName, key)
+    if type(globals.Config) ~= 'table' then
+        globals.Config = {}
+    end
     local schemaSection = globals.Schema[sectionName]
     if not schemaSection or not schemaSection.Properties or not schemaSection.Properties[key] then
         return
@@ -3447,6 +3518,9 @@ local function DrawField(sectionName, key)
 end
 
 EnsureConfigSection = function(sectionName)
+    if type(globals.Config) ~= 'table' then
+        globals.Config = {}
+    end
     if not globals.Config[sectionName] then
         globals.Config[sectionName] = {}
     end
@@ -3618,7 +3692,7 @@ local function ApplySetupPreset(presetName)
         cfg.Heals = cfg.Heals or {}
         cfg.Cures = cfg.Cures or {}
         cfg.Pet = cfg.Pet or {}
-        cfg.General.CharInfo = string.format('%s|%d|GOLD', tostring(mq.TLO.Me.Class.Name() or 'Unknown'), tonumber(mq.TLO.Me.Level() or globals.MyLevel) or 0)
+        cfg.General.CharInfo = string.format('%s|%d|GOLD', tostring(SafeTLOCall(function() return mq.TLO.Me.Class.Name() end, 'Unknown')), tonumber(SafeTLOCall(function() return mq.TLO.Me.Level() end, globals.MyLevel) or globals.MyLevel) or 0)
         cfg.General.Role = 'Assist'
         cfg.General.MedOn, cfg.General.MedStart, cfg.General.SitToMed = 1, 20, 0
         cfg.General.AcceptInvitesOn, cfg.General.CastRetries, cfg.General.BuffWhileChasing = 1, 3, 1
@@ -3636,9 +3710,9 @@ local function ApplySetupPreset(presetName)
 
     local function NormalizeLoadedTemplateIdentity(cfg)
         cfg.General = cfg.General or {}
-        local className = tostring(mq.TLO.Me.Class.Name() or globals.MyClass or 'Unknown')
+        local className = tostring(SafeTLOCall(function() return mq.TLO.Me.Class.Name() end, globals.MyClass or 'Unknown') or 'Unknown')
         className = className:gsub('^%l', string.upper)
-        local levelNow = tonumber(mq.TLO.Me.Level() or globals.MyLevel) or (globals.MyLevel or 0)
+        local levelNow = tonumber(SafeTLOCall(function() return mq.TLO.Me.Level() end, globals.MyLevel) or globals.MyLevel) or (globals.MyLevel or 0)
         local currentCharInfo = tostring(cfg.General.CharInfo or '')
         local tier = currentCharInfo:match('^[^|]*|%d+|([^|]+)$') or 'GOLD'
         cfg.General.CharInfo = string.format('%s|%d|%s', className, levelNow, tier)
@@ -3722,7 +3796,7 @@ local function ApplySetupPreset(presetName)
     end
 
     local switchedToCharINI = EnsureActiveINIForCurrentCharacter()
-    local levelNow = tonumber(mq.TLO.Me.Level() or globals.MyLevel) or (globals.MyLevel or 0)
+    local levelNow = tonumber(SafeTLOCall(function() return mq.TLO.Me.Level() end, globals.MyLevel) or globals.MyLevel) or (globals.MyLevel or 0)
     local classShort = tostring(globals.MyClass or ''):upper()
     local presetUpper = tostring(presetName or 'GROUP'):upper()
     local templatePath, bucket = FindPresetTemplateFile(levelNow, classShort, presetUpper)
@@ -3997,11 +4071,12 @@ local function DrawMiniSetupWindow()
     end
 
     local function GetMacroStatusMini()
-        local macro = mq.TLO.Macro() -- UPDATED: cache TLO handle once for nil-safe access
-        if not macro or macro.Name() ~= 'muleassist.mac' then -- UPDATED: nil-safe macro existence/name check
+        local macro = mq.TLO.Macro
+        local macroName = SafeTLOCall(function() return macro.Name() end, nil)
+        if macroName ~= 'muleassist.mac' then
             return 'STOPPED', {1.00, 0.35, 0.35, 1.0}
         end
-        if macro.Paused() then -- UPDATED: use cached macro handle for paused-state check
+        if SafeTLOCall(function() return macro.Paused() end, false) then
             return 'PAUSED', {1.00, 0.85, 0.20, 1.0}
         end
         return 'RUNNING', {0.30, 1.00, 0.45, 1.0}
@@ -4488,10 +4563,9 @@ local function DrawIntegrationsTab()
                 ImGui.SameLine()
                 if ImGui.Button('Open', bw, 0) then
                     if tool.script == 'luaconsole' then
-                        mq.cmd('/lua stop luaconsole') -- UPDATED: force restart to avoid stale toggle-bind instances
-                        mq.delay(50) -- UPDATED: brief yield between stop/run for deterministic restart
-                        mq.cmd('/lua run luaconsole') -- UPDATED: launch fresh console instance in visible default state
-                        bottomActionMsg = tool.name..': restarted and opened'
+                        mq.cmd('/lua stop luaconsole')
+                        pendingLuaConsoleRestartAt = mq.gettime() + 50
+                        bottomActionMsg = tool.name..': restart queued'
                     else
                         mq.cmd(tool.openCmd)
                         bottomActionMsg = tool.name..': open/toggle command sent'
@@ -4712,6 +4786,7 @@ local function DrawWindowHeaderSettings()
     ImGui.SetCursorPosX(120)
     ImGui.PushItemWidth(350)
     globals.INIFile,_ = ImGui.InputText('##INIInput', globals.INIFile)
+    ImGui.PopItemWidth()
     ImGui.SameLine()
     if ImGui.Button('Choose...') then
         filedialog.set_file_selector_open(true)
@@ -4772,6 +4847,7 @@ local function DrawWindowHeaderSettings()
     ImGui.SetCursorPosX(120)
     ImGui.PushItemWidth(190)
     selected_start_command = DrawComboBox('##StartCommands', selected_start_command, globals.Schema['StartCommands'])
+    ImGui.PopItemWidth()
     ImGui.SameLine()
     ImGui.PushItemWidth(300)
     if selected_start_command == 'custom' then
@@ -4779,20 +4855,22 @@ local function DrawWindowHeaderSettings()
     else
         globals.MAUI_Config[maui_ini_key]['StartCommand'],_ = ImGui.InputText('##StartCommand', selected_start_command)
     end
+    ImGui.PopItemWidth()
     --ImGui.SameLine()
     ImGui.Text('Status: ')
     ImGui.SameLine()
     ImGui.SetCursorPosX(120)
-    local macro = mq.TLO.Macro() -- UPDATED: cache TLO handle once for nil-safe access
-    if not macro or macro.Name() ~= 'muleassist.mac' then -- UPDATED: nil-safe macro existence/name check
+    local macro = mq.TLO.Macro
+    local macroName = SafeTLOCall(function() return macro.Name() end, nil)
+    if macroName ~= 'muleassist.mac' then
         ImGui.TextColored(1, 0, 0, 1, 'STOPPED')
         ImGui.SameLine()
         if ImGui.Button('Start Macro') then
             mq.cmd(globals.MAUI_Config[maui_ini_key]['StartCommand'])
             SaveMAUIConfig()
         end
-    elseif macro.Name() == 'muleassist.mac' then -- UPDATED: reuse cached macro handle for branch checks
-        if macro.Paused() then -- UPDATED: reuse cached macro handle for paused-state check
+    else
+        if SafeTLOCall(function() return macro.Paused() end, false) then
             ImGui.TextColored(1, 1, 0, 1, 'PAUSED')
             ImGui.SameLine()
             if ImGui.Button('End') then
@@ -4814,7 +4892,7 @@ local function DrawWindowHeaderSettings()
             end
         end
         ImGui.SameLine()
-        ImGui.Text(string.format('Role: %s', tostring(macro.Variable('Role')() or 'Unknown'))) -- UPDATED: nil-safe macro variable rendering
+        ImGui.Text(string.format('Role: %s', tostring(SafeTLOCall(function() return macro.Variable('Role')() end, 'Unknown'))))
     end
     if globals.Config.error then
         ImGui.SameLine()
@@ -5012,10 +5090,8 @@ while not terminate do
         memgem = nextMem.gem
     end
     if memspell then
-        -- FIX 8: .RankName() returns userdata without () - must call () to get the string value.
-        local rankname = mq.TLO.Spell(memspell).RankName()
+        local rankname = SafeTLOCall(function() return mq.TLO.Spell(memspell).RankName() end, nil)
         if rankname then
-            -- RankName is already evaluated above via (), it is now a string
             mq.cmdf('/memspell %s "%s"', memgem, rankname)
             local waitUntil = mq.gettime() + 3000
             while mq.gettime() < waitUntil do
@@ -5029,6 +5105,11 @@ while not terminate do
         end
         memspell = nil
         memgem = 0
+    end
+    if pendingLuaConsoleRestartAt and mq.gettime() >= pendingLuaConsoleRestartAt then
+        mq.cmd('/lua run luaconsole')
+        pendingLuaConsoleRestartAt = nil
+        bottomActionMsg = 'LuaConsole: restarted and opened'
     end
     local nowMs = mq.gettime()
     if nowMs >= nextCachePruneAt then

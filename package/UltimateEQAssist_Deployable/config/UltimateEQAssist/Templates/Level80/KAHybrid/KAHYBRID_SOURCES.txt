@@ -1,0 +1,20 @@
+﻿KAHybrid class source selection:
+WAR: L125 - 125 Warrior Kissassist ini  (mod of sic&#039;s 120 NOS) | https://www.redguides.com/community/resources/125-warrior-kissassist-ini-mod-of-sics-120-nos.2950/
+CLR: L125 - 125 Cleric for LS | https://www.redguides.com/community/resources/125-cleric-for-ls.2985/
+PAL: L120 - 120 Paladin | https://www.redguides.com/community/resources/120-paladin.2381/
+RNG: L115 - 115 Ranger, Ranged DPS | https://www.redguides.com/community/resources/115-ranger-ranged-dps.1774/
+SHD: L130 - 130, SK tank, Uses AE&#039;s | https://www.redguides.com/community/resources/130-sk-tank-uses-aes.3277/
+DRU: L125 - 125 Druid - Laurion&#039;s Song DPS Based w/ light heals | https://www.redguides.com/community/resources/125-druid-laurions-song-dps-based-w-light-heals.3038/
+MNK: L120 - 120 TOL Monk | https://www.redguides.com/community/resources/120-tol-monk.2369/
+BRD: L125 - 125 Bard for LS | https://www.redguides.com/community/resources/125-bard-for-ls.2953/
+ROG: L125 - 125 Rogue for LS | https://www.redguides.com/community/resources/125-rogue-for-ls.2954/
+SHM: L125 - 125 Healing Shaman for LS | https://www.redguides.com/community/resources/125-healing-shaman-for-ls.2952/
+NEC: L120 - 120 Necro ToL | https://www.redguides.com/community/resources/120-necro-tol.2314/
+WIZ: L125 - 125 LS Fire Wizard | https://www.redguides.com/community/resources/125-ls-fire-wizard.2993/
+MAG: L120 - 120 ToL Silver Mage | https://www.redguides.com/community/resources/120-tol-silver-mage.2601/
+ENC: L120 - 120 Enchanter ToL | https://www.redguides.com/community/resources/120-enchanter-tol.2371/
+BST: L125 - 125 Beastlord for LS | https://www.redguides.com/community/resources/125-beastlord-for-ls.2955/
+BER: L125 - 125 Berserker for LS | https://www.redguides.com/community/resources/125-berserker-for-ls.2956/
+
+Generated files: 48
+Total KA resources scanned: 1499

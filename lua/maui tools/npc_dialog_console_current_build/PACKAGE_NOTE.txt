@@ -1,0 +1,8 @@
+﻿NPC Dialog Console - Current Build Package
+
+Contents:
+- lua/npc_dialog_console.lua (active runtime script)
+- config/npc_dialog_logger/* (current runtime data/export/cache/patch files)
+- docs/images/ (drop screenshots here for README)
+
+Created: 2026-04-22

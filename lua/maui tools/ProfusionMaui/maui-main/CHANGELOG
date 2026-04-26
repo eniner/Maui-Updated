@@ -1,0 +1,101 @@
+0.11.0
+- Update to use CursorAttachment for dragging in spell gems.. thought i pushed this already..
+0.10.0
+- Rename folder to maui and use init.lua
+0.9.11
+- Fix nil ImGui.Text input
+0.9.10
+- Remove spell.SPA call that serves no purpose and no longer functions
+0.9.9
+- Fix error in left clicking spells on spell set tab
+0.9.8
+- Add use of PackageMan to download lfs.dll
+0.9.7
+- Error handling broken/missing section header in INI file load
+0.9.6
+- Fix mem spell event
+0.9.5
+- Add `/memmyspells` button to SpellSet tab
+0.9.4
+- Fix something i already forgot
+0.9.3
+- Fix something i already forgot
+0.9.2
+- Fix something i already forgot
+0.9.1
+- Fix file dialog not displaying full content
+- Improve aa and disc right click menu
+0.9.0
+- Add file selection dialog for choosing INI files
+- Caching for TLO lookups to improve performance
+- Add a red theme option. It doesn't persist the setting, just for fun
+- Fix up some stuff being marked as red/missing
+0.8.4
+- add a maui.lua at top level so you can `/lua run maui`
+0.8.3
+- skipped
+0.8.2
+- Add Rogue to list of sections to display tabs for
+- Check INI file exists when clicking reload
+- Display error if trying to load INI file that does not exist
+0.8.1
+- Memorize spell button added to right click menu on abilities.
+- A couple of small schema fixes
+0.8.0
+- Add dropdown menu of preconfigured macro start commands
+0.7.5
+- Add spell downgrade button
+- Add event to update spell list when memorizing new spells
+0.7.4
+- Add /maui [show|hide]. The window X button will no longer end the script.
+- Persist INI File name in MAUI character settings
+- Auto-add .ini to input filenames if someone leaves them off
+0.7.3
+- Add end and pause/resume buttons
+- Persist Start Command to `configDir/server_Charactername.ini` for each character under `[MAUI]` section
+0.7.2
+- Fix writing INI when missing size property from INI
+0.7.1
+- Add support for dropping items into MAUI in places that accept items, like the DPS list, pet focus, etc.
+- Fix drag/drop entering into selected item view of the drop target
+0.7.0
+- Add drag/drop support for rearranging list entries in sections like DPS, Buffs, Heals, etc.
+0.6.1
+- Add tostring in a couple spots where LIP might give us a number when we wanted a string
+- Change LIP to write keys in a more user friendly order
+- Prefer INI with no level over INI with level
+0.6
+- Import KA INI file (WIP, YMMV)
+- MA/KA toggle (WIP, stick to MA)
+0.5.3
+- Dump the guide into tooltips
+0.5.2
+- No new content, just changed the packaging on RG
+0.5.1
+- Add some debug output
+0.5
+- Copy previous level INIs to current level if one is found (within 10 levels)
+- Selecting a list item like DPS1 will drill-down to an edit view for the selected item, rather than 
+  drawing the edit fields for the selected item in-line.
+  InputText fields don't seem to be very responsive if several textures are being drawn, like if the DPS tab
+  is showing 15 spells at once. The InputText fields can barely be typed in during that scenario.
+0.4.1
+- Bug fix for shared lists when Lemons_Info.ini does not exist
+0.4
+- Debug tab
+- MySpells under SpellSet
+- Shared Lists
+0.3
+- Swap tab bar for left hand side menu
+- Add Save Spell Set button under spell set settings
+- Some layout tweaks to spell picker menu and list item icons
+0.2
+- Frames for list items, highlighting for selected item
+- Added some more options from the macro
+0.1
+- Customize LIP for sorting keys
+- Spell upgrade buttons
+- Some different handling for values with multiple parts
+  - not using atm...
+- Break up spell name and options after the | into separate inputs
+- Initial recreate of original MuleAssist UI

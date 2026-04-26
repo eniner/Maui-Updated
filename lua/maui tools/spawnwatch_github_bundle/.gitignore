@@ -1,0 +1,6 @@
+﻿# Local backups/temp
+*.tmp
+*.bak
+
+# MQ runtime caches/logs if created locally
+*.log
