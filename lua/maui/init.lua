@@ -3596,6 +3596,35 @@ local function SetSectionEnabled(sectionName, enabled)
 end
 
 local function ApplySetupPreset(presetName)
+    local existingConfig = globals.Config
+
+    local function MergeMissingConfig(targetCfg, sourceCfg)
+        if type(targetCfg) ~= 'table' or type(sourceCfg) ~= 'table' then
+            return
+        end
+        for sectionName, sectionData in pairs(sourceCfg) do
+            if type(sectionData) == 'table' then
+                if type(targetCfg[sectionName]) ~= 'table' then
+                    targetCfg[sectionName] = {}
+                end
+                for key, value in pairs(sectionData) do
+                    if targetCfg[sectionName][key] == nil then
+                        targetCfg[sectionName][key] = value
+                    end
+                end
+            elseif targetCfg[sectionName] == nil then
+                targetCfg[sectionName] = sectionData
+            end
+        end
+    end
+
+    local function MergeMissingConfigFromExisting(cfg)
+        if type(existingConfig) ~= 'table' or type(cfg) ~= 'table' then
+            return
+        end
+        MergeMissingConfig(cfg, existingConfig)
+    end
+
     local function EnsureActiveINIForCurrentCharacter()
         local levelName = globals.Schema['INI_PATTERNS']['level']:format(globals.MyServer, globals.MyName, globals.MyLevel)
         local noLevelName = globals.Schema['INI_PATTERNS']['nolevel']:format(globals.MyServer, globals.MyName)
@@ -3681,6 +3710,59 @@ local function ApplySetupPreset(presetName)
             end
         end
         return nil
+    end
+
+    local function CountConfigSections(cfg)
+        if type(cfg) ~= 'table' then
+            return 0
+        end
+        local count = 0
+        for _, sectionData in pairs(cfg) do
+            if type(sectionData) == 'table' and next(sectionData) ~= nil then
+                count = count + 1
+            end
+        end
+        return count
+    end
+
+    local function FindRichClassTemplateFile(levelNow, classShort, presetUpper)
+        local templatesRoot = NormalizePath(mq.configDir .. '/UltimateEQAssist/Templates')
+        local importedRoot = NormalizePath(templatesRoot .. '/ImportedRG')
+        local roots = {}
+        if lfs.attributes(importedRoot, 'mode') == 'directory' then
+            table.insert(roots, importedRoot)
+        end
+        if lfs.attributes(templatesRoot, 'mode') == 'directory' then
+            table.insert(roots, templatesRoot)
+        end
+        if #roots == 0 then
+            return nil, nil, 0
+        end
+
+        local bestPath, bestBucket, bestScore = nil, nil, 0
+        local orderedBuckets = GetOrderedLevelBuckets(levelNow, roots)
+        for _, bucket in ipairs(orderedBuckets) do
+            local prefix = string.format('UltimateEQAssist_L%d_%s_%s', bucket, classShort, presetUpper)
+            local candidates = {
+                string.format('%s/Level%d/KAHybrid/%s_KAHYBRID.ini', importedRoot, bucket, prefix),
+                string.format('%s/Level%d/Presets/%s.ini', importedRoot, bucket, prefix),
+                string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', importedRoot, bucket, bucket, classShort),
+                string.format('%s/Level%d/KAHybrid/%s_KAHYBRID.ini', templatesRoot, bucket, prefix),
+                string.format('%s/Level%d/Presets/%s.ini', templatesRoot, bucket, prefix),
+                string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', templatesRoot, bucket, bucket, classShort),
+                string.format('%s/UltimateEQAssist_%s.ini', templatesRoot, classShort),
+            }
+            for _, p in ipairs(candidates) do
+                if utils.FileExists(p) then
+                    local cfg = LIP.load(p, false)
+                    local score = CountConfigSections(cfg)
+                    if not bestPath or score > bestScore or (score == bestScore and (not bestBucket or bucket > bestBucket)) then
+                        bestPath, bestBucket, bestScore = p, bucket, score
+                    end
+                end
+            end
+        end
+        return bestPath, bestBucket, bestScore
     end
 
     local function BuildFallbackCleanConfig()
@@ -3807,6 +3889,17 @@ local function ApplySetupPreset(presetName)
     else
         globals.Config = BuildFallbackCleanConfig()
     end
+    -- Some level templates are intentionally minimal. Backfill from the richest available class template.
+    local richTemplatePath, _, richScore = FindRichClassTemplateFile(levelNow, classShort, presetUpper)
+    if richTemplatePath and utils.FileExists(richTemplatePath) then
+        local currentScore = CountConfigSections(globals.Config)
+        if richScore > currentScore then
+            local richCfg = LIP.load(richTemplatePath, false)
+            MergeMissingConfig(globals.Config, richCfg)
+        end
+    end
+    -- Preserve existing sections/keys not present in the selected template.
+    MergeMissingConfigFromExisting(globals.Config)
     ApplyModeDeltas(globals.Config)
     local inferredSizes, autoDisabled = NormalizeEnabledModuleSizes(globals.Config)
 
@@ -4623,6 +4716,7 @@ local function DrawUltimateLayout()
                     if ImGui.BeginTabItem('Combat', nil, flags) then
                         if ImGui.BeginTabBar('##UEA_CombatSubtabs') then
                             if ImGui.BeginTabItem('Aggro') then SafeDrawSection('Combat/Aggro', function() DrawSectionTab('Aggro') end); ImGui.EndTabItem() end
+                            if ImGui.BeginTabItem('Melee') then SafeDrawSection('Combat/Melee', function() DrawSectionTab('Melee') end); ImGui.EndTabItem() end
                             if ImGui.BeginTabItem('DPS') then SafeDrawSection('Combat/DPS', function() DrawSectionTab('DPS') end); ImGui.EndTabItem() end
                             if ImGui.BeginTabItem('Burn') then SafeDrawSection('Combat/Burn', function() DrawSectionTab('Burn') end); ImGui.EndTabItem() end
                             if ImGui.BeginTabItem('GoM') then SafeDrawSection('Combat/GoM', function() DrawSectionTab('GoM') end); ImGui.EndTabItem() end
@@ -4668,6 +4762,11 @@ local function DrawUltimateLayout()
                     flags = (pendingConfigTab == 'SpellSet / Gems') and ImGuiTabItemFlags.SetSelected or ImGuiTabItemFlags.None
                     if ImGui.BeginTabItem('SpellSet / Gems', nil, flags) then
                         SafeDrawSection('SpellSet / Gems', function() DrawSectionTab('SpellSet') end)
+                        ImGui.EndTabItem()
+                    end
+                    flags = (pendingConfigTab == 'All Sections') and ImGuiTabItemFlags.SetSelected or ImGuiTabItemFlags.None
+                    if ImGui.BeginTabItem('All Sections', nil, flags) then
+                        SafeDrawSection('All Sections', DrawWindowPanels)
                         ImGui.EndTabItem()
                     end
                 end
