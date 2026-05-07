@@ -1,0 +1,41 @@
+	#event OutOfStuff "Sorry, but you don't have everything you need for this recipe in your general inventory."
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: Main
+| --------------------------------------------------------------------------------------------
+	Sub Main
+:Loop
+
+:ClearCursor
+	/if (${Cursor.ID}) {
+		/if (${Cursor.ID}==16925) /destroy
+		/autoinventory
+		/goto :ClearCursor
+	}
+
+	/notify TradeskillWnd CombineButton leftmouseup
+	/doevents
+	/call delete_item
+	/delay 2
+	/notify TradeskillWnd AutoInvButton leftmouseup
+	/goto :Loop
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: Event_OutOfStuff
+| --------------------------------------------------------------------------------------------
+	Sub Event_OutOfStuff
+	/endmacro
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: delete_item
+| --------------------------------------------------------------------------------------------
+	Sub delete_item
+	/delay 1s
+	/if (${Cursor.ID}==9686) /destroy
+	/return
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

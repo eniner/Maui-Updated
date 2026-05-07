@@ -1,0 +1,69 @@
+D 2026-05-05 18:15:15.637728 [EQLib] Logging initialized
+D 2026-05-05 18:15:15.638721 [EQLib] Initializing hooks
+I 2026-05-05 18:15:15.638779 [EQLib] Initializing EQGraphics
+I 2026-05-05 18:15:20.391360 [EQLib] Initializing EQMain
+D 2026-05-05 18:15:20.391787 [MQ] Initializing Login Detours
+I 2026-05-05 18:15:20.773258 [MQ] Toggle console keybind: ctrl+`
+I 2026-05-05 18:15:20.773633 [MQ] Creating ImGui Context
+I 2026-05-05 18:15:20.784498 [MQ] Using ImGui configuration file: C:\Users\E9ine\Downloads\MQ Fresh\Config\MacroQuest_Overlay.ini
+I 2026-05-05 18:15:20.784571 [MQ] Using ImGui log file: C:\Users\E9ine\Downloads\MQ Fresh\Logs\MacroQuest_Overlay.log
+D 2026-05-05 18:15:20.853176 [MQ] Initializing module: CrashHandler
+D 2026-05-05 18:15:20.853231 [MQ] Initializing module: FrameLimiter
+D 2026-05-05 18:15:20.855393 [MQ] Initializing module: InputAPI
+D 2026-05-05 18:15:20.855515 [MQ] Initializing module: DeveloperTools
+D 2026-05-05 18:15:20.859030 [MQ] Initializing module: Windows
+D 2026-05-05 18:15:20.859779 [MQ] Initializing module: ImGuiAPI
+D 2026-05-05 18:15:20.860394 [MQ] Initializing module: Spells
+D 2026-05-05 18:15:20.860426 [MQ] Initializing module: DataAPI
+D 2026-05-05 18:15:20.860445 [MQ] Initializing module: ActorAPI
+D 2026-05-05 18:15:20.860462 [MQ] Initializing module: GroundSpawns
+D 2026-05-05 18:15:20.860479 [MQ] Initializing module: Spawns
+D 2026-05-05 18:15:20.928944 [MQ] Initializing module: Items
+D 2026-05-05 18:15:20.929486 [MQ] Initializing module: PostOffice
+D 2026-05-05 18:15:20.934035 [MQ] Initializing module: DisplayHook
+D 2026-05-05 18:15:20.934530 [MQ] Initializing module: EmuExtensions
+D 2026-05-05 18:15:21.091211 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2autologin.DLL
+D 2026-05-05 18:15:21.091272 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2bzsrch.DLL
+D 2026-05-05 18:15:21.091305 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2chatwnd.DLL
+D 2026-05-05 18:15:21.091335 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2custombinds.DLL
+D 2026-05-05 18:15:21.091365 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2eqbugfix.DLL
+D 2026-05-05 18:15:21.091396 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2itemdisplay.DLL
+D 2026-05-05 18:15:21.091425 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2labels.DLL
+D 2026-05-05 18:15:21.091453 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2lua.DLL
+D 2026-05-05 18:15:21.091481 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2map.DLL
+D 2026-05-05 18:15:21.091510 [MQ] Module loaded: C:\Users\E9ine\Downloads\MQ Fresh\Plugins\mq2eqbc.DLL
+I 2026-05-05 18:15:21.091730 [MQ] MacroQuest Loaded.
+I 2026-05-05 18:15:21.151505 [MQ] IDirect3DDevice9::EndScene: TestCooperativeLevel was successful, reacquiring device.
+D 2026-05-05 18:15:21.151779 [MQ] MQGraphicsEngine: InvalidateDeviceObjects
+D 2026-05-05 18:15:21.151837 [MQ] MQGraphicsEngine: CreateDeviceObjects
+I 2026-05-05 18:15:21.178960 [MQ] Received crashpad pipe name: \\.\pipe\crashpad_16080_SQPUMIIOELVFXYOI
+I 2026-05-05 18:15:21.183135 [MQ] Enabling shared crash reporter. Crash report guid: 9d75a07d-df6b-4b3d-9c37-267b1787d614
+I 2026-05-05 18:15:28.529385 [MQ] IDirect3DDevice9::Reset hook: device instance is the acquired device.
+D 2026-05-05 18:15:28.529442 [MQ] MQGraphicsEngine: InvalidateDeviceObjects
+D 2026-05-05 18:15:28.550606 [EQLib] Cleaning up EQMain
+D 2026-05-05 18:15:28.550690 [MQ] Removing Login Detours
+I 2026-05-05 18:15:32.776158 [MQ] IDirect3DDevice9::EndScene: TestCooperativeLevel was successful, reacquiring device.
+D 2026-05-05 18:15:32.776227 [MQ] MQGraphicsEngine: CreateDeviceObjects
+I 2026-05-05 18:15:49.321236 [MQ] MQ2Overlay: Resetting overlay
+D 2026-05-05 18:15:49.321281 [MQ] MQGraphicsEngine: InvalidateDeviceObjects
+I 2026-05-05 18:15:49.368509 [MQ] Destroying ImGui Context
+I 2026-05-05 18:15:49.371287 [MQ] Creating ImGui Context
+I 2026-05-05 18:15:49.371996 [MQ] Using ImGui configuration file: C:\Users\E9ine\Downloads\MQ Fresh\Config\MacroQuest_Overlay.ini
+I 2026-05-05 18:15:49.372073 [MQ] Using ImGui log file: C:\Users\E9ine\Downloads\MQ Fresh\Logs\MacroQuest_Overlay.log
+I 2026-05-05 18:15:49.715679 [MQ] IDirect3DDevice9::EndScene: TestCooperativeLevel was successful, reacquiring device.
+D 2026-05-05 18:15:49.715833 [MQ] MQGraphicsEngine: InvalidateDeviceObjects
+D 2026-05-05 18:15:49.715862 [MQ] MQGraphicsEngine: CreateDeviceObjects
+W 2026-05-05 18:17:24.140007 [EQLib] A window was created that is not being tracked: 'PotionBeltWnd' at 0x14efc1c
+W 2026-05-05 18:17:24.140068 [EQLib] A window was created that is not being tracked: 'PointMerchantWnd' at 0x17442f8
+W 2026-05-05 18:17:24.140087 [EQLib] A window was created that is not being tracked: 'NewPointMerchantWnd' at 0x17440b8
+W 2026-05-05 18:17:24.140103 [EQLib] A window was created that is not being tracked: 'GroupMentorWindow' at 0x1741670
+W 2026-05-05 18:17:24.140119 [EQLib] A window was created that is not being tracked: 'LeadershipWindow' at 0x1743be8
+I 2026-05-05 18:17:26.450775 [MQ] MQ2Overlay: Resetting overlay
+D 2026-05-05 18:17:26.450818 [MQ] MQGraphicsEngine: InvalidateDeviceObjects
+I 2026-05-05 18:17:26.450899 [MQ] Destroying ImGui Context
+I 2026-05-05 18:17:26.452533 [MQ] Creating ImGui Context
+I 2026-05-05 18:17:26.454143 [MQ] Using ImGui configuration file: C:\Users\E9ine\Downloads\MQ Fresh\Config\MacroQuest_Overlay\Ultimate EQ_Eniine.ini
+I 2026-05-05 18:17:26.454183 [MQ] Using ImGui log file: C:\Users\E9ine\Downloads\MQ Fresh\Logs\MacroQuest_Overlay_Ultimate EQ_Eniine.log
+I 2026-05-05 18:17:27.628843 [MQ] IDirect3DDevice9::EndScene: TestCooperativeLevel was successful, reacquiring device.
+D 2026-05-05 18:17:27.629033 [MQ] MQGraphicsEngine: InvalidateDeviceObjects
+D 2026-05-05 18:17:27.629066 [MQ] MQGraphicsEngine: CreateDeviceObjects

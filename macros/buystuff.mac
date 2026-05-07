@@ -1,0 +1,32 @@
+| Buystuff 2.0 by Maskoi 12/12/2013
+| Exclusive macro for members of Redguides.com
+| Don't steal it or we'll punch your fase!
+| Usage:
+| target the vendor
+| /mac buystuff "water flask" 100
+
+	#include ninjadvloot.inc
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: main
+| --------------------------------------------------------------------------------------------
+	sub main
+
+	/declare StuffToBuy string outer
+	/declare AmountToBuy int outer
+
+	/if (${Defined[Param0]}) {
+		/varset StuffToBuy ${Param0}
+	}
+	/if (${Defined[Param1]}) {
+		/varset AmountToBuy ${Param1}
+	}
+
+	/call SetupAdvLootVars
+	/call npc "${Taget.CleanName}"
+	/call Buy "${StuffToBuy}" ${AmountToBuy}
+	/return
+
+
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

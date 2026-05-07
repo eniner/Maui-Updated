@@ -1,0 +1,30 @@
+| loot.mac by Maskoi 01/22/2014 Redguides.com
+
+	#include ninjadvloot.inc
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: main
+| --------------------------------------------------------------------------------------------
+	sub main
+	/declare CampZone               int         outer       ${Zone.ID}
+	/declare CampXLoc               int         outer       ${Me.X}
+	/declare CampYLoc               int         outer       ${Me.Y}
+	/declare CampZLoc               int         outer       ${Me.Z}
+	/declare LookForward            int         outer       ${Me.Heading.DegreesCCW}
+	/echo Starting Loot macro. I will check for corpses to loot every 30s.
+	/call SetupAdvLootVars
+	/varset CorpseRadius 100
+	/varset MobsTooClose 10
+:top
+	/doevents
+	/moveto mdist 10
+	/call LootMobs
+	/delay 2s
+	/moveto loc ${CampYLoc} ${CampXLoc}
+	/delay 2s ${MoveTo.Stopped}
+	/face heading ${LookForward}
+	/delay 30s
+	/goto :top
+	/return
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

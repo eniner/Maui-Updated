@@ -1,0 +1,47 @@
+| Dumpaa.mac :: Sym 04-18-2012
+| Dumps every aa shown in your ui to an ini file, formatted to be usable by MQ2AASpend
+| Reorder as you like then paste into the MQ2AASpend_AAList section of your servername_charname.ini and then run /aaspend load
+| Physical order of entries determines buy order, not numerical order.
+| The *only* requirement for left side of = is they are unique. You *DO NOT* have to renumber entries if you change the order.
+|
+| Output file is MQ2AASpend_charname-NEW.ini
+|
+| General tab abilities are prefixed by 1
+| Archtype tab abilities are prefixed by 2
+| Class tab abilities are prefixed by 3
+| Special tab abilities are prefixed by 4
+|
+| Does *NOT* write/show entries that are currently maxxed.
+|
+|
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: Main
+| --------------------------------------------------------------------------------------------
+	sub Main
+
+	/declare a int local
+	/declare b int local
+	/declare AAName string local
+	/declare AALevel string local
+	/declare curLevel int local
+	/declare maxLevel int local
+
+	/for a 1 to 5
+		/for b 1 to ${Window[AAWindow].Child[List${a}].Items}
+			/varset AAName ${Window[AAWindow].Child[List${a}].List[${b}, 1]}
+			/varset AALevel ${Window[AAWindow].Child[List${a}].List[${b}, 2]}
+
+			/varset curLevel ${AALevel.Arg[1,"/"]}
+			/varset maxLevel ${AALevel.Arg[2,"/"]}
+
+			/if (${curLevel} != ${maxLevel}) {
+				/echo Name: ${AAName} ** Level: ${AALevel}
+				/ini MQAASpend_${Me.Name}-NEW.ini MQ2AASpend_AAList "${a}${b}" "${AAName}|M"
+			}
+		/next b
+	/next a
+
+	/return
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

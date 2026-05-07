@@ -1,0 +1,131 @@
+|This will run through your kissassist ini file and verify spell
+|and ability names. It will also allow you to dump your memed spells
+|and abilities to an ini file for you to copy and paste to correct
+|any ini issues.
+|Enjoy!  -NoStress
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: Main
+| --------------------------------------------------------------------------------------------
+	Sub Main
+	/declare TV string local
+	/declare i int local 1
+	/declare a int local
+	/declare r int local 1 | moves through the sections
+	/declare Section1 string local Buffs
+	/declare Section2 string local DPS
+	/declare Section3 string local BURN
+	/declare Section4 string local HEALS
+	/declare spelldump int local 0
+	/declare trash string local
+	/declare slash int local
+	/declare spellbookdump 0
+	/squelch /alias /spelldump /varset spelldump 1
+	/squelch /alias /spellbookdump /varset spellbookdump 1
+
+|Get Spell name
+
+:Scanner
+	/if (${r} <= 4) {
+		/echo
+		/echo Starting scan on ${Section${r}}
+		/echo -------------------------------
+		/For i 1 to 20
+			/varset trash ${Ini["KissAssist_${Me.Name}.ini", ${Section${r}}, ${Section${r}}${i}]}
+			/if (${trash.NotEqual[null]}) {
+				/varcalc slash ${trash.Find[|]}-1
+				/if (${trash.Find[|]} == NULL) /varset slash ${trash.Length}
+				/if (${Me.Book[${trash.Left[${slash}]}]} == NULL) {
+					/if (${Me.CombatAbility[${trash.Left[${slash}]}]} == NULL) {
+						/if (${Me.AltAbility[${trash.Left[${slash}]}]} == NULL) {
+							/if (${FindItem[=${trash.Left[${slash}]}].ID} == NULL) {
+								/echo Unable to find ${trash.Left[${slash}]} as a spell, AA, Item of Combat Ability
+							}
+						}
+					}
+				}
+			}
+		/next i
+		/varcalc r ${r}+1
+		/delay 1s
+		/goto :Scanner
+	}
+	/echo
+	/echo
+	/echo ===========================================================
+	/Echo Done. If you would like to dump a list of your memed spell
+	/echo and combatabilities to get the proper spelling to an ini file
+	/echo just type /spelldump  If you would like your whole spellbook
+	/echo dumps to an ini file type /spellbookdump
+	/echo otherwise /endmacro =)
+	/echo ===========================================================
+
+:Spelldump
+	/delay 3s
+	/if (${spelldump}==1) /call spelldump
+	/if (${spellbookdump}==1) /call spellbookdump
+	/goto :Spelldump
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: spelldump
+| --------------------------------------------------------------------------------------------
+	Sub spelldump
+	/declare i int local
+	/declare name string local
+
+	/for i 1 to 12
+		/varset name ${Me.Gem[${i}]
+		/if (${name.NotEqual[NULL]}) {
+			/ini "KissSpellNames_${Me.Name}.ini" "Memorized Spells"  "Gem${i}" "${Me.Gem[${i}]}"
+		}
+	/next i
+
+	/for i 1 to 6
+		/varset name ${Me.Ability[${i}]}
+		/if (${name.NotEqual[null]}) {
+			/ini "KissSpellNames_${Me.Name}.ini" "Abilities" "Ability ${i}" "${Me.Ability[${i}]}"
+		}
+	/next i
+
+	/for i 1 to 8
+		/varset name ${Me.CombatAbility[${i}]}
+		/if (${name.NotEqual[null]}) {
+			/ini "KissSpellNames_${Me.Name}.ini" "Combat Abilities" "CombatAbility ${i}" "${Me.CombatAbility[${i}]}"
+		}
+	/next i
+
+	/echo
+	/echo ================================================================
+	/echo Memed Spells and Abilities written to file KissSpellNames_${Me.Name}.ini in your macros folder.
+	/echo Copy and paste the the names into your kiss ini files to help avoid issues.
+	/echo ================================================================
+	/endmacro
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: spellbookdump
+| --------------------------------------------------------------------------------------------
+	Sub spellbookdump
+	/declare spell_book_slots string outer 720
+	/declare PageNum int outer
+	/declare i int local 1
+	/for i 1 to ${spell_book_slots}
+		/if (${Me.Book[${i}].Name.NotEqual[NULL]}) {
+			/varcalc PageNum (${i}/8)+.9
+			/echo Slot #${i} ${Me.Book[${i}]} Page ${PageNum}
+			/ini "${Me.Name}Spells.ini" "Spell Level ${Me.Book[${i}].Level}" "|     Spell ID ${Me.Book[${i}].ID}" "${Me.Book[${i}].Name} - ${Me.Book[${i}].Skill} - ${Me.Book[${i}].TargetType} - Page ${PageNum}"
+		} else {
+			/goto :Skip
+		}
+	:Skip
+	/next i
+	/echo ========================
+	/echo All spells written to ${Me.Name}Spells.ini in your macro folder
+	/echo ========================
+	/endmacro
+	/return
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

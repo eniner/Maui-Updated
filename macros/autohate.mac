@@ -1,0 +1,25 @@
+| --------------------------------------------------------------------------------------------
+| SUB: main
+| --------------------------------------------------------------------------------------------
+	sub main
+
+	/declare AutoHater int outer
+	/call
+	/return AutoHater
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: FindAutoHate
+| --------------------------------------------------------------------------------------------
+	Sub FindAutoHate
+	/declare i int local
+	/for i 1 to 10
+		/if (${Me.XTarget[${i}].Type.Equal[Auto Hater]}) {
+			/varset AutoHater ${i}
+			/echo ${i}
+		}
+	/next i
+	/return
+
+
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

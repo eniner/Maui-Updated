@@ -1,0 +1,51 @@
+
+| ShrinkEm Ver 0.3
+| Shrinks all members of your group
+
+Sub Main
+	| Specify your shrink item's name here, must be able to be Targetable
+	/declare ShrinkItem 		string	outer		"Bracelet of the Shadow Hive"
+
+	| Cast Delay in 10th's a second, it's also smart to give a little buffer. IE 15 = 1.5 seconds.
+	/declare ShrinkDelay		int		outer   	15
+
+	| Shrink Pets? 1 = Yes 0 = No	
+	/declare ShrinkPets			int		outer		1 	
+
+	| No Edits are needed past this point.
+
+	/declare Ver					string	outer  		0.3
+	/declare IAmABard				bool	outer		${Me.Class.Name.Equal[Bard]}
+
+
+	/call DoShrink
+/return
+
+sub DoShrink
+	/declare Person			int			local   0
+    /if (${IAmABard}) { 
+		/twist off 
+		/stopsong
+		/delay 5
+	}
+	/for Person 0 to 5
+		/if (${Group.Member[${Person}].ID}) {
+			/echo Shrinking ${Group.Member[${Person}].Name}
+			/target ID ${Group.Member[${Person}].ID}
+			/delay 5
+			/itemnotify ${ShrinkItem} rightmouseup
+			/delay ${ShrinkDelay}
+			/itemnotify ${ShrinkItem} rightmouseup
+			/delay ${ShrinkDelay}
+			/if (${Group.Member[${Person}].Pet.ID} && ${ShrinkPets} >0) {
+				/echo Shrinking ${Group.Member[${Person}].Name}'s Pet ${Group.Member[${Person}].Pet.CleanName}
+				/target ID ${Group.Member[${Person}].Pet.ID}
+				/delay 5
+				/itemnotify ${ShrinkItem} rightmouseup
+				/delay ${ShrinkDelay}
+				/itemnotify ${ShrinkItem} rightmouseup
+				/delay ${ShrinkDelay}
+			}
+		}
+	/next Person
+/return

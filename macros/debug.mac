@@ -1,0 +1,17 @@
+/declare debug bool outer TRUE
+
+Sub Main
+    /echo MQ2Mule Debug mode ON
+    :loop
+    /delay 5
+    /if (${debug}) /call LogMuleUI
+    /goto :loop
+/return
+
+Sub LogMuleUI
+    /echo === Mule Pulse Debug ===
+    /echo Current menu pointer? (if exposed) ${Me.MuleMenu}  <-- probably doesn't exist, just example
+    /echo Target spell category count? ${Me.Spell[some known spell].Category} etc
+    /docommand /mule debug   <-- if mule has any debug command
+    /echo Last pulse row attempt? (watch logs)
+    /return

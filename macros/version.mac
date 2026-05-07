@@ -1,0 +1,31 @@
+|version.mac
+|lists loaded plugins into an ini, with relevant versions if possible.
+
+Sub Main
+	/declare i int local 0
+	
+	/echo \ag[MQ2]
+	/echo \atMQ2: \ay${MacroQuest.Version}
+	/echo \atInternal: \ay${MacroQuest.InternalName}
+	/echo \atBuild Date: \ay${MacroQuest.BuildDate}
+	/echo \atPing: \ay${MacroQuest.Ping}\n
+	/ini Version.ini "MQ2" "MQ2" "${MacroQuest.Version}"
+	/ini Version.ini "MQ2" "Internal" "${MacroQuest.InternalName}"
+	/ini Version.ini "MQ2" "Build Date" "${MacroQuest.BuildDate}"
+	/ini Version.ini "MQ2" "Ping" "${MacroQuest.Ping}"
+	
+	/echo \ag[Errors]
+	/echo \ayError: \ar${MacroQuest.Error}
+	/echo \aySyntaxError: \ar${MacroQuest.SyntaxError}
+	/echo \ayMQ2DataError: \ar${MacroQuest.MQ2DataError}\n
+	/ini Version.ini "Errors" "Error" "${MacroQuest.Error}"
+	/ini Version.ini "Errors" "SyntaxError" "${MacroQuest.SyntaxError}"
+	/ini Version.ini "Errors" "MQ2DataError" "${MacroQuest.MQ2DataError}"
+	
+	/echo \ag[Plugins]
+	/for i 1 to 100
+		/if (!${Bool[${Plugin[${i}]}]}) /break
+		/echo \at${Plugin[${i}]}: \ay${Plugin[${i}].Version}
+		/ini Version.ini "Plugins" "${Plugin[${i}]}" "${Plugin[${i}].Version}"
+	/next i
+/return

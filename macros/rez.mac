@@ -1,0 +1,16 @@
+	Sub Main
+
+:wait
+	/delay 5s ${Window[ConfirmationDialogBox].Open}
+	/if (!${Window[ConfirmationDialogBox].Open}) /goto :wait
+	/if (${Window[ConfirmationDialogBox].Open}) {
+		/nomodkey /notify ConfirmationDialogBox Yes_Button leftmouseup
+	}
+	/delay 5s
+	/if (${Window[RespawnWnd].Open}) /nomodkey /notify RespawnWnd RW_OptionsList listselect 2
+	/delay 5s
+	/if (${Window[RespawnWnd].Open}) /nomodkey /notify RespawnWnd RW_SelectButton leftmouseup
+	/goto :wait
+
+	/return
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

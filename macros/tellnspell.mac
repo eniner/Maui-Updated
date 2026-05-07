@@ -1,0 +1,97 @@
+| TellnSpell.mac v 1.2 03/30/2018 by Maskoi For Redguide Members ONLY
+| a simple buffbot macro with customized tells for spells
+
+#Chat tell
+
+    Sub Main
+        /declare MacroName                                      string      outer       TellnSpell
+        /declare MacroVer                                       string      outer       1.2
+        /declare IniFileName                                    string      outer       ${MacroName}_${Me.CleanName}.ini
+        /declare Debug                                          int         outer       0
+        /ini "${IniFileName}" "General" "MacroVer" "${MacroVer}
+        /call LoadIni General MiscGem                           int         8
+        /call LoadIni TellnSpell TellnSpellHelp                 string                 "Syntax: The Tell Text|Spell/AA Name|Spell/AA -  TellnSpell1=Give me focus|Talisman of the Courageous|Spell"
+        /declare TellnSpell[10]                                 string      outer
+        /call LoadIni TellnSpell TellnSpell                     string      NULL        TellnSpell
+        /echo Starting ${MacroName} Ver: ${MacroVer} by Maskoi for RedGiude's Members Only
+        :top
+            /doevents
+            /delay 10
+        /goto :top
+    /return
+| ----------------------------------------------------------------------------
+| SUB: Load Ini
+| ----------------------------------------------------------------------------
+    Sub LoadIni(string sectionName, string varName, string varType, string varValue, string varArray, string FileName)
+        /if (${Debug}) {
+            /delay 2
+            /echo DEBUG Sub Loadini ${sectionName} ${varName} ${varType} ${varValue} ${varArray} ${FileName}
+        }
+        | Assign ini name to default ini if not defined
+        /if (${FileName.Length}==0) {
+            /if (!${Defined[FileName]}) /declare FileName string local
+            /varset FileName ${IniFileName}
+        }
+        | Check if ini value is asking for an array ie buff1 to buff20
+        /if (${${varArray}.Size}>0) {
+            /declare i int local
+                /for i 1 to ${${varArray}.Size}
+                    /if (!${Ini[${FileName},${sectionName},${varArray}${i}].Length}) /ini "${FileName}" "${sectionName}" "${varArray}${i}" "${varValue}"
+                    /if (${Ini[${FileName},${sectionName},${varArray}${i}].Length}) /varset ${varArray}[${i}]  ${Ini[${FileName},${sectionName},${varArray}${i}]}
+                /next i
+            /return
+        } else {
+            /if (!${Defined[${varName}]} && ${Defined[varType]}) /declare ${varName} ${varType} outer
+            /if (!${Ini[${FileName},${sectionName},${varName}].Length}) {
+                /if (${varValue.Length}) {
+                    /ini "${FileName}" "${sectionName}" "${varName}" "${varValue}"
+                    /varset ${varName} ${varValue}
+                    /if (${Debug}) /echo DEBUG Sub Loadini /varset ${varName} ${varValue}
+                }
+            } else {
+                /varset ${varName} ${Ini[${FileName},${sectionName},${varName}]}
+            }
+        }
+        /if (${Debug}) /echo DEBUG LoadIni: leave
+    /return
+| ----------------------------------------------------------------------------
+| SUB: Event_Chat
+| ----------------------------------------------------------------------------   
+    Sub Event_Chat(string ChatType,string ChatSender,string ChatTextRaw)
+         /if (${Debug}) /echo ${ChatType} ${ChatSender} ${ChatTextRaw}
+        /declare i int local
+        /if (!${Select[${ChatType},eqbc,TELL]} || (${ChatType.Equal[TELL]} && ${Select[${Spawn[${ChatSender}].Type},NPC,PET]}) || ${Me.Invis}  || ${Select[${ChatTextRaw},I,NULL]} || !${Spawn[pc ${ChatSender}].ID}) /return
+            /for i 1 to ${TellnSpell.Size}
+                /if (${ChatTextRaw.Find[${TellnSpell[${i}].Arg[1,|]}]}) {
+                     /if (${Debug}) /echo "${TellnSpell[${i}].Arg[2,|]}" ${TellnSpell[${i}].Arg[3,|]} ${Spawn[pc ${ChatSender}].ID}
+                    /call CastSpellFromTell "${TellnSpell[${i}].Arg[2,|]}" ${TellnSpell[${i}].Arg[3,|]} ${Spawn[pc ${ChatSender}].ID}
+                    
+                }
+            /next i
+       }   
+   /return
+| ----------------------------------------------------------------------------
+| SUB: CastSpellFromTell
+| ----------------------------------------------------------------------------
+    Sub CastSpellFromTell(CSFTName, CSFTType, int CSFTTargetID)
+         /if (${Debug}) /echo ${CSFTName} ${CSFTType} ${CSFTTargetID}
+        /if (${Me.AltAbility[${CSFTName}]} && ${Me.AltAbilityReady[${CSFTName}]})  {       
+            /if (${Debug}) /echo DEBUG CastSpellFromTell: Start of AbilityCheck and exceptions.
+            /call casting "${CSFTName}" alt 5s
+            /if (${Debug}) /echo DEBUG CastWhat cast AA result: ${Macro.Return}
+        }
+        /if (${Me.Book[${CSFTName}]} && ${Spell[${CSFTName}].Mana}<=${Me.CurrentMana} && ${Spawn[pc id ${CSFTTargetID}].Distance}<${Spell[${CSFTName}].Range}) {
+            /if (!${Me.Gem[${CSFTName}]}) {
+                /memorize "${CSFTName}" gem${MiscGem}
+                /delay 350 ${Me.SpellReady[${CSFTName}]}
+            }
+            /if (${Me.SpellReady[${CSFTName}]}) {
+                /echo Casting ${CSFTName} on ${Spawn[pc id ${CSFTTargetID}].CleanName}.
+                /tell ${Spawn[pc id ${CSFTTargetID}].CleanName} INC: ${CSFTName}  
+                /casting "${CSFTName}" gem${MiscGem} 3s -maxtries|2 -targetid|${CSFTTargetID}
+                /delay 10
+                /delay 70 !${Me.Casting.ID}
+                /if (${Debug}) /echo DEBUG CastSpellFromTell cast Spell result: ${Macro.Return}
+            }
+        }
+    /return

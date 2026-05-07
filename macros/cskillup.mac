@@ -1,0 +1,283 @@
+| Cskillup.mac by Maskoi v1.8 12/14/2018
+| Based on Arneweise's CastingSkillup.mac
+| Pet additions by alynel
+|
+| Description: This macro will automatically work on your five casting skills.
+|
+| Find a safe place in zone other than Pok, Guild Lobby, Guild Hall or Bazaar,
+|
+| Requires MQ2Cast
+|
+| Syntax: /mac cskillup
+#warning
+#turbo 80
+
+#Event SkillUp "You have become better at #1#! (#2#)"
+#Event MedUp "Insufficient Mana to cast this spell!#*#"
+
+Sub Main
+
+    | Send a gmail message on completion, NOTE: You must configure mq2gmail before enabling or it will not work.  Once configured, change from 0 to 1 to get an email when training complete.
+    /declare sendgmail                int                outer    0
+    /declare SkillName[5]           string          outer
+    /declare PracticeSpell[16,8]    string          outer   
+    /declare CurrentZone            int             outer   ${Zone.ID}
+    /declare SpecSpam               int             outer   1
+    /declare SpecIgnore             int             outer   0
+
+    /varset SkillName[1]            Abjuration
+    /varset SkillName[2]            Alteration
+    /varset SkillName[3]            Conjuration
+    /varset SkillName[4]            Divination
+    /varset SkillName[5]            Evocation
+
+|    CLERIC = 2
+    /varset PracticeSpell[2,1]      Endure Poison
+    /varset PracticeSpell[2,2]      Minor Healing
+    /varset PracticeSpell[2,3]      Halo of Light
+    /varset PracticeSpell[2,4]      True North
+    /varset PracticeSpell[2,5]      Strike
+    /varset PracticeSpell[2,6]      Summoned: Halo of Light
+    /varset PracticeSpell[2,7]      Alteration
+
+|    PALADIN = 3
+    /varset PracticeSpell[3,1]      Courage
+    /varset PracticeSpell[3,2]      Salve
+    /varset PracticeSpell[3,3]      Hammer of Wrath
+    /varset PracticeSpell[3,4]      True North
+    /varset PracticeSpell[3,5]      Cease
+    /varset PracticeSpell[3,6]      Summoned: Hammer of Wrath
+
+|    RANGER = 4
+    /varset PracticeSpell[4,1]      Endure Fire
+    /varset PracticeSpell[4,2]      Salve
+    /varset PracticeSpell[4,3]      Dance of the Fireflies
+    /varset PracticeSpell[4,4]      Glimpse
+    /varset PracticeSpell[4,5]      Burst of fire
+    /varset PracticeSpell[4,6]      Summoned: Firefly Globe
+  
+|    SHADOW KNIGHT = 5
+    /varset PracticeSpell[5,1]      Endure Cold
+    /varset PracticeSpell[5,2]      Siphon Strength
+    /varset PracticeSpell[5,3]      Disease Cloud 
+    /varset PracticeSpell[5,4]      Sense the Dead
+    /varset PracticeSpell[5,5]      Ward Undead
+    /varset PracticeSpell[5,8]      Leering Corpse
+  
+|    DRUID = 6
+    /varset PracticeSpell[6,1]      Skin like Wood
+    /varset PracticeSpell[6,2]      Minor Healing
+    /varset PracticeSpell[6,3]      Summon Food
+    /varset PracticeSpell[6,4]      Sense Animals
+    /varset PracticeSpell[6,5]      Burst of Fire
+    /varset PracticeSpell[6,6]      Summoned: Black Bread
+    /varset PracticeSpell[6,7]      Alteration
+  
+|    SHAMAN = 10
+    /varset PracticeSpell[10,1]     Endure Cold
+    /varset PracticeSpell[10,2]     Minor Healing
+    /varset PracticeSpell[10,3]     Summon Drink
+    /varset PracticeSpell[10,4]     True North
+    /varset PracticeSpell[10,5]     Burst of Flame
+    /varset PracticeSpell[10,6]     Summoned: Globe of Water
+    /varset PracticeSpell[10,7]     Alteration
+  
+|    NECROMANCER = 11
+    /varset PracticeSpell[11,1]     Minor Shielding
+    /varset PracticeSpell[11,2]     Lifetap
+    /varset PracticeSpell[11,3]     Coldlight
+    /varset PracticeSpell[11,4]     True North
+    /varset PracticeSpell[11,5]     Ward Undead
+    /varset PracticeSpell[11,6]     Summoned: Coldlight
+    /varset PracticeSpell[11,7]     Alteration
+    /varset PracticeSpell[11,8]     Cavorting Bones
+  
+|    WIZARD = 12
+    /varset PracticeSpell[12,1]     Minor Shielding
+    /varset PracticeSpell[12,2]     Root
+    /varset PracticeSpell[12,3]     Halo of Light
+    /varset PracticeSpell[12,4]     True North
+    /varset PracticeSpell[12,5]     Blast of Cold
+    /varset PracticeSpell[12,6]     Summoned: Halo of Light
+    /varset PracticeSpell[12,7]     Evocation
+  
+|    MAGICIAN = 13
+    /varset PracticeSpell[13,1]     Minor Shielding
+    /varset PracticeSpell[13,2]     Renew Elements
+    /varset PracticeSpell[13,3]     Summon Brass Choker
+    /varset PracticeSpell[13,4]     True North
+    /varset PracticeSpell[13,5]     Burst of Flame
+    /varset PracticeSpell[13,6]     Jedah's Brass Choker
+    /varset PracticeSpell[13,7]     Conjuration
+    /varset PracticeSpell[13,8]     Elementalkin: Water
+  
+|    ENCHANTER = 14
+    /varset PracticeSpell[14,1]     Minor Shielding
+    /varset PracticeSpell[14,2]     Strengthen
+    /varset PracticeSpell[14,3]     Mesmerize
+    /varset PracticeSpell[14,4]     True North
+    /varset PracticeSpell[14,5]     Chaotic Feedback
+    /varset PracticeSpell[14,6]     Summoned: Globe of Water
+    /varset PracticeSpell[14,7]     Conjuration
+    /varset PracticeSpell[14,8]     Pendril's Animation
+  
+|    BEASTLORD = 15
+    /varset PracticeSpell[15,1]     Endure Cold
+    /varset PracticeSpell[15,2]     Salve
+    /varset PracticeSpell[15,3]     Summon Drink
+    /varset PracticeSpell[15,4]     Sense Animals
+    /varset PracticeSpell[15,5]     Blast of Frost
+    /varset PracticeSpell[15,6]     Summoned: Globe of Water
+    /varset PracticeSpell[15,8]     Spirit of Sharik
+  
+  
+| - Check Class
+     /if (${Select[${Me.Class.Name},Warrior,Berserker,Monk,Rogue,Bard]}>=1) {
+        /echo You need to go buy a clue and a spell book.
+        /end
+    }
+  
+    /call Init
+    /call MemSpells
+    /call SpecializationCheck
+  
+    :MainLoop
+        /call DoCast
+         /if (${Me.PctMana}<=1 || ${Me.PctHPs}<50) /call Event_MedUp
+        /call AreWeDone
+        /doevents
+    /goto :MainLoop
+  
+/return
+
+Sub Init
+    /echo Skill Level/Skill Cap
+    /declare i int local
+    /for i 1 to 5
+        /echo ${SkillName[${i}]}: ${Me.Skill[${SkillName[${i}]}]}/${Me.SkillCap[${SkillName[${i}]}]} - Casting: * ${PracticeSpell[${Me.Class.ID},${i}]} *
+    /next i
+    /if (${sendgmail}) {
+        /if (!${Plugin[MQ2Gmail].Name.Length}) {
+            /plugin mq2gmail noauto
+        }
+        /echo "Gmail notification is configured, it will send you an email when complete"
+    } else /echo "Gmail notification is not configured"
+/return
+
+| - Sub MemSpells
+Sub MemSpells
+    /declare i int local
+    /for i 1 to 5
+        /if (!${Me.Gem[${PracticeSpell[${Me.Class.ID},${i}]}]}) {
+            /echo Memorizing Spell >> ${PracticeSpell[${Me.Class.ID},${i}]} <<
+            /memspell ${i} "${PracticeSpell[${Me.Class.ID},${i}]}"
+            /delay 30s ${Me.Gem[${PracticeSpell[${Me.Class.ID},${i}]}]}
+        }
+    /next i
+/return
+
+Sub DoCast
+    /declare i int local
+    | - Zone check to turn end macro if zoning
+    /if (${Zone.ID}!=${CurrentZone}) {
+        /echo You have zoned ending macro.
+        /end
+    }
+    | IF wizzie ditch familiar can't cast on them
+    /if (${Me.Pet.CleanName.Equal[${Me.Name}`s familiar]} && ${Me.Class.ShortName.Equal[Wiz]}) /pet get lost
+    | - Check for pet class and target pets for spell casting.
+    /if (${Me.Pet.ID}) {
+        /target ${Me.Pet}
+        /delay 10
+    } else /if (${Select[${Me.Class.ShortName},BST,ENC,MAG,NEC,SHD]}>=1 && !${Me.Pet.ID}) {
+        /casting "${PracticeSpell[${Me.Class.ID},8]}" gem6
+        /delay 15s !${Me.Casting.ID}
+        /if (!${Me.Pet.ID}) {
+            /echo Failed to summon a pet, ending macro
+        /end
+        }
+        /target ${Me.Pet}
+        /delay 10
+    } else /if (!${Me.Pet.ID}) {
+        /target id ${Me.ID}
+    }
+
+    /delay 10
+    /for i 1 to 5
+        :SpecializeCap
+        /doevents
+        /if (${Me.Skill[${SkillName[${i}]}]} == ${Me.SkillCap[${SkillName[${i}]}]}) /goto :NextSpell
+      
+        /if (${Spell[${Me.Gem[${i}]}].Name.Equal[Dance of the Fireflies]} && !${GameTime.Night}) /goto :NextSpell
+        /delay 3s !${Me.SpellInCooldown}
+        /if (!${Me.SpellReady[${Me.Gem[${i}]}]}) /goto :NextSpell
+      
+        /if (${Select[${Me.Class.ShortName},BST,ENC,MAG,NEC,SHD]} && ${Me.Pet.ID} && ${i}==5 && ${Target.ID}!=${Me.Pet.ID}) {
+            /target pet ${Me.Pet}
+            /delay 1s
+        } else /if (!${Me.Pet.ID} && ${Target.ID}!=${Me.ID} && ${i}==5) {
+            /target id ${Me.ID}
+            /delay 1s
+        }
+
+        /if (${Me.Skill[${SkillName[${i}]}]} < ${Me.SkillCap[${SkillName[${i}]}]}) {
+            /casting "${PracticeSpell[${Me.Class.ID},${i}]}" gem${i}
+            | /echo Casting ${PracticeSpell[${Me.Class.ID},${i}]} ${i}
+            /delay 5s !${Me.Casting.ID}
+        }
+        | - Check cursor for summoned items and destroy them.
+        /if (${Cursor.Name.Equal[${PracticeSpell[${Me.Class.ID},6]}]}) {
+            /destroy
+            /delay 5s !${Cursor.ID}
+        }
+        /if (${Me.Skill[Specialize ${PracticeSpell[${Me.Class.ID},7]}]}<=100 && ${SkillName[${i}].Equal[${PracticeSpell[${Me.Class.ID},7]}]} && ${Select[${Me.Class.ShortName},CLR,DRU,ENC,MAG,NEC,SHM,WIZ]} && !${SpecIgnore}) {
+            /if (${SpecSpam}) {
+                /echo Casting ${PracticeSpell[${Me.Class.ID},${i}]} until we BREAK 100 in Specialize ${SkillName[${i}]}
+                /varset SpecSpam 0
+                /timed 300 /varset SpecSpam 1
+            }
+            /goto :SpecializeCap
+        }
+        :NextSpell
+    /next i
+/return
+
+Sub Event_SkillUp(S0,S1,S2)
+    /echo >> Your ${S1} skill is now ${S2}. <<
+/return
+
+Sub Event_MedUp
+    /echo Out of mana medding up.
+    /if (!${Me.Mount.ID} && !${Me.Sitting}) /sit
+    :med
+        /delay 10
+    /if (${Me.PctMana}<100 || ${Me.PctHPs}<100) /goto :med
+    /if (!${Me.Mount.ID} && ${Me.Sitting}) /stand
+/return
+
+Sub AreWeDone
+    /declare i int local
+    /declare j int local 0
+    /for i 1 to 5
+        /if (${Me.Skill[${SkillName[${i}]}]} == ${Me.SkillCap[${SkillName[${i}]}]}) /varcalc j ${j}+1
+        /if (${j}==5) {
+            /echo All skills are currently maxed. Ending macro.
+            /if (${sendgmail}) {
+                /gmail "${Me.Name} has finished skilling up!"
+            }
+            /end
+        }
+    /next i
+/return
+
+Sub SpecializationCheck
+    /declare i int local
+    /for i 1 to 5
+        /if (${Me.Skill[Specialize ${SkillName[${i}]}]}>100) {
+            /echo Detected Specialize ${SkillName[${i}]} is over 100 TURNING OFF Break Specialiazion Cap
+            /varset SpecIgnore 1
+            /return
+        }
+    /next i
+/return
+

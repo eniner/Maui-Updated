@@ -1,0 +1,638 @@
+| MagePet maker macro by treehuggingdruid73 Redguides veersion.
+
+	#include spell_routines.inc
+
+|--------------------------------------------------------------------------------
+|SUB: Main
+|--------------------------------------------------------------------------------
+	Sub Main
+
+	/declare ival                  int    outer
+	/declare bag                   string outer
+	/declare slot                  string outer
+	/declare invSlotName            string outer
+
+	/declare doDiminutive        bool   outer  FALSE
+	/declare doAegis                bool   outer  FALSE
+
+	/declare CastDelay             int    outer  1
+	/declare CastRetryTime         int    outer  6
+
+	/declare NormalSpellSet        string outer  Bot
+	/declare PetSpellSet           string outer  Pet
+	/declare oldPrimary            string outer
+
+	/declare PouchName              string outer "Pouch of Quellious"
+	/declare SatchelName            string outer "Phantom Satchel"
+
+	/declare PetSummonSpell        string outer  "Shard of Earth"
+	/declare PetSummonSpellGem     int    outer  1
+
+	/declare SpellPetWep           string outer  "Grant Frightforged Armaments"
+	/declare SpellPetWepGem        int    outer  2
+	/declare PetWeaponPack           string outer  "Folded Pack of Frightforged Armaments"
+
+	/declare PetWep1                string outer  "Summoned: Frightforged Ragesword"
+	/declare PetWep2                string outer  "Summoned: Frightforged Ragesword"
+
+	/declare SpellPetHasteItem     string outer  "Grant Visor of Gobeker"
+	/declare SpellPetHasteItemGem    int    outer  3
+	/declare PetHasteItem           string outer  "Summoned: Visor of Gobeker"
+
+	/declare SpellPetArmor         string outer  "Grant Frightforged Plate"
+	/declare SpellPetArmorGem      int    outer  4
+	/declare PetArmorPack           string outer  "Folded Pack of Frightforged Plate"
+
+	/declare PetArmor1             string outer  "Frightforged Plate Helm"
+	/declare PetArmor2             string outer  "Frightforged Plate Vambraces"
+	/declare PetArmor3             string outer  "Frightforged Plate Gauntlets"
+	/declare PetArmor4             string outer  "Frightforged Plate Boots"
+	/declare PetArmor5             string outer  "Frightforged Plate Bracers"
+	/declare PetArmor6             string outer  "Frightforged Plate Breastplate"
+	/declare PetArmor7             string outer  "Frightforged Plate Greaves"
+	/declare PetArmor8             string outer  "Summoned: Frightforged Belt"
+
+	/declare SpellPetBuff1         string outer  "Velocity"
+	/declare SpellPetBuff1Gem      int    outer  5
+
+	/declare SpellPetBuff2         string outer  "Burnout XI Rk. II"
+	/declare SpellPetBuff2Gem      int    outer  6
+
+	/declare SpellPetBuff3         string outer  "Iceflame Eminence Rk. II"
+	/declare SpellPetBuff3Gem      int    outer  7
+
+	/declare SpellPetBuff4         string outer  "Arcane Distillect Rk II"
+	/declare SpellPetBuff4Gem      int    outer  8
+
+	/declare SpellPetBuff5         string outer  "Phantasmal Symbiosis Rk. II"
+	/declare SpellPetBuff5Gem      int    outer  9
+
+	/declare SpellPetBuff6         string outer  "Circle of Flameskin Rk. III"
+	/declare SpellPetBuff6Gem      int    outer  10
+
+	/declare SpellPetBuff7         string outer  "Aegis of Nefori Rk. III"
+	/declare SpellPetBuff7Gem      int    outer  11
+
+|------------------------------------------------------------------------
+| --- Bypass all settings and config pet type. ---
+
+|--- Check for required plugin.
+	/call PluginCheck
+
+	/if (${Defined[Param0]}) {
+		/if (${Param0.Equal[air]}) {
+			/varset PetSummonSpell "Shard of Air"
+		} else /if (${Param0.Equal[water]}) {
+			/varset PetSummonSpell "Shard of Water"
+		} else /if (${Param0.Equal[fire]}) {
+			/varset PetSummonSpell "Shard of Fire"
+		} else /if (${Param0.Equal[earth]}) {
+			/varset PetSummonSpell "Shard of Earth"
+		} else /if (${Param0.Equal[help]}) {
+			/echo Syntax is: /macro magepet100 [pet type] [weapon1] [weapon2]
+			/echo [pet type] options are: [air], [water], [fire], [earth].
+			/echo [weapon1] and [weapon2] options are:
+			/echo -- [wind], [fire], [ice], [taunt], [detaunt].
+			/echo Example: /macro magepet earth fire ice
+			/end
+		}
+	} else {
+		/echo You did not supply a parameter for [pet type] !
+		/echo You are missing required parameters, please use "/macro magepet help" for syntax.
+		/end
+	}
+
+	/if (${Defined[Param1]}) {
+		/if (${Param1.Equal[wind]}) {
+			/varset PetWep1 "Summoned: Frightforged Shortsword"
+		} else /if (${Param1.Equal[fire]}) {
+			/varset PetWep1 "Summoned: Frightforged Fireblade"
+		} else /if (${Param1.Equal[ice]}) {
+			/varset PetWep1 "Summoned: Frightforged Iceblade"
+		} else /if (${Param1.Equal[taunt]}) {
+			/varset PetWep1 "Summoned: Frightforged Ragesword"
+		} else /if (${Param1.Equal[detaunt]}) {
+			/varset PetWep1 "Summoned: Frightforged Mindblade"
+		}
+	} else {
+		/echo You did not supply a parameter for [weapon1] !
+		/echo You are missing required parameters, please use "/macro magepet help" for syntax.
+		/end
+	}
+
+	/if (${Defined[Param2]}) {
+		/if (${Param2.Equal[wind]}) {
+			/varset PetWep2 "Summoned: Frightforged Shortsword"
+		} else /if (${Param2.Equal[fire]}) {
+			/varset PetWep2 "Summoned: Frightforged Fireblade"
+		} else /if (${Param2.Equal[ice]}) {
+			/varset PetWep2 "Summoned: Frightforged Iceblade"
+		} else /if (${Param2.Equal[taunt]}) {
+			/varset PetWep2 "Summoned: Frightforged Ragesword"
+		} else /if (${Param2.Equal[detaunt]}) {
+			/varset PetWep2 "Summoned: Frightforged Mindblade"
+		}
+	} else {
+		/echo You did not supply a parameter for [weapon2] !
+		/echo You are missing required parameters, please use "/macro magepet help" for syntax.
+		/end
+	}
+
+|------------------------------------------------------------------------
+
+|--- pack8=30 - pack9=31 - pack10-32
+
+	/if (${String[${FindItem[${InvSlot[32].Item}]}].NotEqual[NULL]}) {
+		/beep
+		/echo Item is in pack10 (${InvSlot[32].Item}), quitting.
+		/end
+	}
+
+	/call SummonPet
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Summon Pet
+|--------------------------------------------------------------------------------
+	Sub SummonPet
+
+| --- Disabled to not remem long duration recast spells.
+	/memspellset ${PetSpellSet}
+
+|-------------------------------------------------
+	/if (!${Me.Pet.ID} ) {
+
+	:SummonMyPet
+
+		/if (!${Me.Gem[${PetSummonSpell}]}) {
+			/echo Attempting to load ${PetSummonSpell} in slot ${PetSummonSpellGem}.
+			/memspell ${PetSummonSpellGem} ${PetSummonSpell}
+		}
+
+	:PetSummonWait
+		/delay 5
+		/if (!${Me.SpellReady[${PetSummonSpell}]}) /goto :PetSummonWait
+
+		/echo Summoning my pet.
+		/varcalc CastDelay 2*${Spell[${PetSummonSpell}].RecoveryTime}
+		/casting ${PetSummonSpell}
+		/call CheckCasting
+		/delay ${CastDelay}s
+		/if (!${Me.Pet.ID}) /goto :SummonMyPet
+
+	}
+|-------------------------------------------------
+
+	/if (${Me.Pet.ID}) {
+
+		/call GiveToPet
+		/delay 10
+		/moveto loc ${Target.Y} ${Math.Calc[${Target.X}-15]}
+		/delay 5s !${Me.Moving}
+	:NoMovement
+		/if (${Me.Moving}) {
+			/delay 2
+			/if (${Me.Moving}) /goto :NoMovement
+		}
+		/face
+		/delay 10
+		/call GiveToMe
+
+	|--------------------------------------------------
+	|-- Load Pet Weapon spell and give it x2
+	|--------------------------------------------------
+		/if (!${Me.Gem[${SpellPetWep}]}) {
+			/echo Attempting to load ${SpellPetWep} spell in slot ${SpellPetWepGem}.
+			/memspell ${SpellPetWepGem} ${SpellPetWep}
+		:PetWepSpellWait
+			/delay 5
+			/if (!${Me.SpellReady[${SpellPetWep}]}) /goto :PetWepSpellWait
+		}
+
+		/varcalc CastDelay 2*${Spell[${SpellPetWep}].RecoveryTime}
+		/echo + Summoning pet weapons for ${Me.Pet.CleanName}.
+		/call GiveToMe
+		/casting ${SpellPetWep}
+		/call CheckCasting
+		/delay ${CastDelay}s
+
+	:AutoInv1
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${PetWeaponPack}]}) /autoinventory
+		/delay 5
+		/if (${Cursor.ID}) /goto :AutoInv1
+
+	|--- Click the "Folded Pack of XXX Armaments"
+		/varset slot ${FindItem[${PetWeaponPack}].InvSlot}
+		/itemnotify ${InvSlot[${slot}]} rightmouseup
+	|--- Delay 2 sec to convert pack to pouch.
+		/delay 2s
+
+	:AutoInv2
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${PouchName}]}) /autoinventory
+		/delay 5
+		/if (${Cursor.ID}) /goto :AutoInv2
+
+		/call GetInvSlotID ${PouchName}
+		/varset bag ${invSlotName}
+		/itemnotify ${Me.Inventory[${bag}].InvSlot} rightmouseup
+		/delay 5
+
+		/call GiveToPet
+		/face
+
+	|-------------------------------------------
+		/for ival 1 to 2
+			/varset slot ${FindItem[${PetWep${ival}}].InvSlot}
+			/itemnotify ${InvSlot[${slot}]} leftmouseup
+			/delay 5
+
+		:OpenGiveWindowA
+			/if (${Cursor.Name.Equal[${PetWep${ival}}]}) {
+				/echo - Giving (${Cursor.Name}) to (${Target.CleanName}).
+				/nomodkey /click left target
+				/delay 3s ${Window[GiveWnd].Open}
+				/if (!${Window[GiveWnd].Open}) /goto :OpenGiveWindowA
+			}
+
+		/next ival
+	|-------------------------------------------
+
+		/notify GiveWnd GVW_Give_Button leftmouseup
+		/delay 5
+
+		/itemnotify ${Me.Inventory[${bag}].InvSlot} leftmouseup
+		/delay 5
+
+	:Destroy1
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${PouchName}]}) /destroy
+		/delay 5
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${PouchName}]}) /goto :Destroy1
+
+		/echo Closing inventory.
+		/keypress I
+		/delay 5
+	|--------------------------------------------------
+
+	|--------------------------------------------------
+	|-- Load Pet haste item spell and give it x1
+	|--------------------------------------------------
+		/if (!${Me.Gem[${SpellPetHasteItem}]}) {
+			/echo Attempting to load ${SpellPetHasteItem} spell in slot ${SpellPetHasteItemGem}.
+			/memspell ${SpellPetHasteItemGem} ${SpellPetHasteItem}
+		:PetItem1Wait
+			/delay 5
+			/if (!${Me.SpellReady[${SpellPetHasteItem}]}) /goto :PetItem1Wait
+		}
+
+		/varcalc CastDelay 2*${Spell[${SpellPetHasteItem}].RecoveryTime}
+		/echo + Summoning ${PetHasteItem} for ${Me.Pet.CleanName}.
+		/call GiveToMe
+		/casting ${SpellPetHasteItem}
+		/call CheckCasting
+		/delay ${CastDelay}s
+
+		/call GiveToPet
+
+	:OpenGiveWindowB
+		/if (${Cursor.Name.Equal[${PetHasteItem}]}) {
+			/echo - Giving (${Cursor.Name}) to (${Target.CleanName}).
+			/nomodkey /click left target
+			/delay 3s ${Window[GiveWnd].Open}
+			/if (!${Window[GiveWnd].Open}) /goto :OpenGiveWindowB
+			/notify GiveWnd GVW_Give_Button leftmouseup
+			/delay 5
+		}
+
+		/echo Closing inventory.
+		/keypress I
+		/delay 5
+	|--------------------------------------------------
+
+	|--------------------------------------------------
+	|-- Load Pet Armor spell and give it x8
+	|--------------------------------------------------
+		/if (!${Me.Gem[${SpellPetArmor}]}) {
+			/echo Attempting to load ${SpellPetArmor} spell in slot ${SpellPetArmorGem}.
+			/memspell ${SpellPetArmorGem} ${SpellPetArmor}
+		:PetArmorSpellWait
+			/delay 5
+			/if (!${Me.SpellReady[${SpellPetArmor}]}) /goto :PetArmorSpellWait
+		}
+
+		/varcalc CastDelay 2*${Spell[${SpellPetArmor}].RecoveryTime}
+		/echo + Summoning pet armor for ${Me.Pet.CleanName}.
+		/call GiveToMe
+		/casting ${SpellPetArmor}
+		/call CheckCasting
+		/delay ${CastDelay}s
+
+	:AutoInv3
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${PetArmorPack}]}) /autoinventory
+		/delay 5
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${PetArmorPack}]}) /goto :AutoInv3
+
+	|--- Click the "Folded Pack of Manaforged Plate"
+		/varset slot ${FindItem[${PetArmorPack}].InvSlot}
+		/itemnotify ${InvSlot[${slot}]} rightmouseup
+	|--- Delay 2 sec to convert pack to pouch
+		/delay 2s
+
+	:AutoInv4
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${SatchelName}]}) /autoinventory
+		/delay 5
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${SatchelName}]}) /goto :AutoInv4
+
+	|/if (!${Window[InventoryWindow].Open}) /keypress Inventory
+	|/delay 20 ${Window[InventoryWindow].Open}
+		/call GetInvSlotID ${SatchelName}
+		/varset bag ${invSlotName}
+		/itemnotify ${Me.Inventory[${bag}].InvSlot} rightmouseup
+		/delay 5
+
+		/call GiveToPet
+
+	|-------------------------------------------
+		/for ival 1 to 4
+
+			/varset slot ${FindItem[${PetArmor${ival}}].InvSlot}
+			/itemnotify ${InvSlot[${slot}]} leftmouseup
+			/delay 5
+
+		:OpenGiveWindowC
+			/if (${Cursor.Name.Equal[${PetArmor${ival}}]}) {
+				/echo - Giving (${Cursor.Name}) to (${Target.CleanName}).
+				/nomodkey /click left target
+				/delay 3s ${Window[GiveWnd].Open}
+				/if (!${Window[GiveWnd].Open}) /goto :OpenGiveWindowC
+			}
+
+		/next ival
+	|-------------------------------------------
+
+		/notify GiveWnd GVW_Give_Button leftmouseup
+		/delay 5
+
+	|-------------------------------------------
+		/for ival 5 to 8
+
+			/varset slot ${FindItem[${PetArmor${ival}}].InvSlot}
+			/itemnotify ${InvSlot[${slot}]} leftmouseup
+			/delay 5
+
+		:OpenGiveWindowD
+			/if (${Cursor.Name.Equal[${PetArmor${ival}}]}) {
+				/echo - Giving (${Cursor.Name}) to (${Target.CleanName}).
+				/nomodkey /click left target
+				/delay 3s ${Window[GiveWnd].Open}
+				/if (!${Window[GiveWnd].Open}) /goto :OpenGiveWindowD
+			}
+
+		/next ival
+	|-------------------------------------------
+
+		/notify GiveWnd GVW_Give_Button leftmouseup
+		/delay 5
+
+		/itemnotify ${Me.Inventory[${bag}].InvSlot} leftmouseup
+		/delay 5
+
+	:Destroy2
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${SatchelName}]}) /destroy
+		/delay 5
+		/if (${Cursor.ID} && ${Cursor.Name.Equal[${SatchelName}]}) /goto :Destroy2
+
+		/echo Closing inventory.
+		/keypress I
+		/delay 5
+	|--------------------------------------------------
+
+	|--------------------------------------------------
+	|-- Buff Pet Fully
+	|--------------------------------------------------
+
+	|-- If i have the aa, cast it and skip last buff (Aegis of Kildrukaun)
+		/if (${doAegis} && ${Me.AltAbilityReady[Aegis of Kildrukaun]}) {
+			/casting "Aegis of Kildrukaun" alt
+			/call CheckCasting
+			/for ival 1 to 7
+			} else {
+				/for ival 1 to 6
+				}
+
+				/if (!${Me.Gem[${SpellPetBuff${ival}}]}) {
+					/echo Attempting to load ${SpellPetBuff${ival}} spell in slot ${SpellPetBuff${ival}Gem}.
+					/memspell ${SpellPetBuff${ival}Gem} ${SpellPetBuff${ival}}
+
+				:BuffPetWait
+					/delay 5
+					/if (!${Me.SpellReady[${SpellPetBuff${ival}}]}) /goto :BuffPetWait
+				}
+
+				/varcalc CastDelay 2*${Spell[${SpellPetBuff${ival}}].RecoveryTime}
+				/echo +++ Casting ${SpellPetBuff${ival}} on ${Me.Pet.CleanName}.
+				/casting ${SpellPetBuff${ival}}
+				/call CheckCasting
+				/delay ${CastDelay}s
+
+			/next ival
+		|--------------------------------------------------
+
+		|--------------------------------------------------
+		|-- Check for epic 2.0/1.5 buff on pet.
+		|--------------------------------------------------
+		|-- Check for epic 2.0 and cast.
+			/if (${FindItem[Focus of Primal Elements].ID} && !${Target.Buff[Primal Fusion].ID}) {
+				/echo ++ Found epic 2.0 !
+			|/call EquipItem "Focus of Primal Elements"
+			|/varset oldPrimary ${Macro.Return}
+				/casting "Focus of Primal Elements" item
+				/call CheckCasting
+			|/delay 10
+			|/call EquipItem ${oldPrimary}
+			|-- Check for epic 1.5 and cast.
+			} else /if (${FindItem[Staff of Elemental Essence].ID} && !${Target.Buff[Elemental Conjunction].ID}) {
+				/echo ++ Found epic 1.5 !
+			|/call EquipItem "Staff of Elemental Essence"
+			|/varset oldPrimary ${Macro.Return}
+				/casting "Staff of Elemental Essence" item
+				/call CheckCasting
+			|/delay 10
+			|/call EquipItem ${oldPrimary}
+			}
+
+		|--------------------------------------------------
+
+			/memspellset ${NormalSpellSet}
+			/delay 5
+			/if (${Me.Pet.Stance.NotEqual[FOLLOW]}) /pet follow
+			/delay 5
+			/pet focus on
+			/delay 5
+			/if (!${Me.Pet.GHold}) /pet ghold on
+			/delay 5
+			/if (!${Me.Pet.Taunt}) /pet taunt on
+			/delay 5
+
+			/if (${doDiminutive} && ${Me.AltAbilityReady[Diminutive Companion]}) /casting "Diminutive Companion" alt
+
+			} |-- if Me.Pet.ID END
+
+			/echo --------------------------------------------------
+			/echo OK, *>>> ${Me.Pet.CleanName} <<<* is ready to rock !
+			/echo --------------------------------------------------
+
+			/squelch /target clear
+
+			/return
+		|--------------------------------------------------------------------------------
+
+		|--------------------------------------------------------------------------------
+		|SUB: GiveToMe
+		|--------------------------------------------------------------------------------
+			Sub GiveToMe
+
+		:TargetMe
+			/echo - Targeting me. . .
+			/squelch /target ${Me.CleanName}
+			/delay 3s ${Target.ID}==${Me.ID}
+			/if (${Target.ID}!=${Me.ID}) /goto :TargetMe
+			/delay 5
+
+			/return
+		|--------------------------------------------------------------------------------
+
+		|--------------------------------------------------------------------------------
+		|SUB: GiveToPet
+		|--------------------------------------------------------------------------------
+			Sub GiveToPet
+
+		:TargetMyPet
+			/echo - Targeting my pet. . .
+			/squelch /target ${Me.Pet}
+			/delay 3s ${Target.ID}==${Me.Pet.ID}
+			/if (${Target.ID}!=${Me.Pet.ID}) /goto :TargetMyPet
+			/delay 5
+
+			/return
+		|--------------------------------------------------------------------------------
+
+		|--------------------------------------------------------------------------------
+		|SUB: CheckCasting
+		|--------------------------------------------------------------------------------
+			Sub CheckCasting
+
+			/if (${Me.Casting.ID}) {
+				/echo *** Waiting to finish casting. ***
+			:WaitForCasting
+				/delay 5
+				/if (${Me.Casting.ID}) /goto :WaitForCasting
+			}
+
+			/return
+		|--------------------------------------------------------------------------------
+
+		|--- 11 Oct 2013 by EqMule
+		|--- -Removed PetTarget and PetCombat
+		|--- -Added new TLO members for ${Me.Pet}
+		|--- - Buff example: /echo ${Me.Pet.Buff[1]} returns a pSpellType
+		|--- example: /echo ${Me.Pet.Buff[Spirit of Wolf]} returns a pIntType (The slot the buff is in)
+		|--- - Combat example: /echo ${Me.Pet.Combat} returns a pBoolType TRUE or FALSE (on/off)
+		|--- - GHold example: /echo ${Me.Pet.GHold} returns a pBoolType TRUE or FALSE (on/off)
+		|--- - Hold example: /echo ${Me.Pet.Hold} returns a pBoolType TRUE or FALSE (on/off)
+		|--- - ReGroup example: /echo ${Me.Pet.ReGroup} returns a pBoolType TRUE or FALSE (on/off)
+		|--- - Stance example: /echo ${Me.Pet.Stance} returns a pStringType "FOLLOW" or "GUARD"
+		|--- - Stop example: /echo ${Me.Pet.Stop} returns a pBoolType TRUE or FALSE (on/off)
+		|--- - Target example: /echo ${Me.Pet.Target} returns a pSpawnType of the pets current target
+		|--- - Taunt example: /echo ${Me.Pet.Taunt} returns a pBoolType TRUE or FALSE (on/off)
+
+		|--------------------------------------------------------------------------------
+		|SUB: PluginCheck
+		|--------------------------------------------------------------------------------
+			Sub PluginCheck
+
+			/echo Checking for required plugins . . .
+
+			/if (!${Plugin[MQ2MoveUtils].Name.Equal[MQ2MoveUtils]}) {
+				/echo Loading MQ2MoveUtils plugin, because this macro requires it !
+				/squelch /plugin MQ2MoveUtils load
+				/delay 1s
+				/if (!${Plugin[MQ2MoveUtils].Name.Equal[MQ2MoveUtils]}) {
+					/beep
+					/echo Unable to load MQ2MoveUtils plugin, quiting.
+					/end
+				}
+			} else {
+				/echo MQ2MoveUtils plugin is loaded.
+			}
+
+			/if (!${Plugin[MQ2Cast].Name.Equal[MQ2Cast]}) {
+				/echo Loading MQ2Cast plugin, because this macro requires it !
+				/squelch /plugin MQ2Cast load
+				/delay 1s
+				/if (!${Plugin[MQ2Cast].Name.Equal[MQ2Cast]}) {
+					/beep
+					/echo Unable to load MQ2Cast plugin, quiting.
+					/end
+				}
+			} else {
+				/echo MQ2Cast plugin is loaded.
+			}
+
+			/echo Plugin check complete . . .
+
+			/return
+		|--------------------------------------------------------------------------------
+
+		|--------------------------------------------------------------------------------
+		|SUB: GetInvSlotID
+		|--------------------------------------------------------------------------------
+			Sub GetInvSlotID(itemName)
+
+			/declare eqLoop            int     local     0
+			/declare equippedArray[33]    string     local
+
+			/varset equippedArray[1] head
+			/varset equippedArray[2] face
+			/varset equippedArray[3] neck
+			/varset equippedArray[4] rightear
+			/varset equippedArray[5] leftear
+			/varset equippedArray[6] arms
+			/varset equippedArray[7] hands
+			/varset equippedArray[8] rightwrist
+			/varset equippedArray[9] leftwrist
+			/varset equippedArray[10] rightfinger
+			/varset equippedArray[11] leftfinger
+			/varset equippedArray[12] shoulder
+			/varset equippedArray[13] back
+			/varset equippedArray[14] chest
+			/varset equippedArray[15] waist
+			/varset equippedArray[16] legs
+			/varset equippedArray[17] feet
+			/varset equippedArray[18] mainhand
+			/varset equippedArray[19] offhand
+			/varset equippedArray[20] ranged
+			/varset equippedArray[21] ammo
+			/varset equippedArray[22] charm
+			/varset equippedArray[23] powersource
+			/varset equippedArray[24] pack1
+			/varset equippedArray[25] pack2
+			/varset equippedArray[26] pack3
+			/varset equippedArray[27] pack4
+			/varset equippedArray[28] pack5
+			/varset equippedArray[29] pack6
+			/varset equippedArray[30] pack7
+			/varset equippedArray[31] pack8
+			/varset equippedArray[32] pack9
+			/varset equippedArray[33] pack10
+
+			/for eqLoop 1 to 33
+				/if (${Me.Inventory[${equippedArray[${eqLoop}]}].ID}==${FindItem[${itemName}].ID}) {
+					/varset invSlotName ${equippedArray[${eqLoop}]}
+				}
+			/next eqLoop
+
+			/return
+		|--------------------------------------------------------------------------------
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

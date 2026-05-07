@@ -1,0 +1,36 @@
+Sub Main
+	|- Delete old aliases
+    /alias /ihcstart delete
+    /alias /rgstart delete
+	/alias /rgprofstart delete
+    /alias /ihcgroup delete
+	/alias /rggroup delete
+	/alias /mgx delete
+	/alias /mgax delete
+	/alias /mgt delete
+    
+	|- Write New Aliases
+	/alias /ihcstart		/macro rgmercs\RGMERC.mac
+    /alias /rgstart		/macro rgmercs\RGMERC.mac
+    /alias /rgprofstart /multiline ; /plugin mq2profiler load noauto ; /profile rgmercs\RGMERC.mac
+	/alias /ihcgroup 		/multiline ; /docommand /dgaex group_${EverQuest.Server}_${Group.Leader} /target ${Me.CleanName} ; /docommand /timed 10 /dgaex group_${EverQuest.Server}_${Group.Leader} /ihcstart
+	/alias /rggroup 		/multiline ; /docommand /dgaex group_${EverQuest.Server}_${Group.Leader} /target ${Me.CleanName} ; /docommand /timed 10 /dgaex group_${EverQuest.Server}_${Group.Leader} /rgstart
+	/alias /rgraid 			/multiline ; /docommand /dgraexecute  /target ${Me.CleanName} ; /docommand /timed 10 /dgraexecute  /rgstart
+	/alias /rgzone			/multiline ; /docommand /dgzaexecute  /target ${Me.CleanName} ; /docommand /timed 10 /dgzaexecute  /rgstart
+	|- Load DanNet so everyone is on and connected when we start the mac
+	/if (!${Bool[${Plugin[MQ2DanNet]}]}) {
+		/echo RGMercs is enabling DanNet
+        /squelch /plugin MQ2DanNet
+    }
+	|- Aliases to make DanNet more feel more like using EQBC
+	/alias /mgx /dggexecute
+	/alias /mgax /dggaexecute
+	/alias /mgt /dgtell group_${EverQuest.Server}_${Group.Leader}
+	/delay 1s        
+	/if (${Plugin[MQ2DanNet].Name.Length}) {
+		/echo RGMercs is turning of DanNet commandechos
+		/if (${DanNet.CommandEcho}) /squelch /dnet commandecho off
+	}
+	/echo !!!Install Complete - Type /rgstart to Begin!!!
+	/popcustom 13 5 !!!Install Complete - Type /rgstart to Begin!!!
+/return 

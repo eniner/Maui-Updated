@@ -1,0 +1,1266 @@
+| This builds upon the Bazaar2 macro written by ChatWithThisName
+|
+| Detailed release notes can be found at:
+| https://www.redguides.com/community/resources/bazaar-mac.23/updates
+|
+| Instructions can be found at:
+| https://www.redguides.com/community/resources/bazaar-mac.23/
+|
+|
+| - Known Issues:
+| Non-English Keyboards.  This is due to a MQ2 limitation.
+| Item's with double quotes " must be updated in the bazaar.ini. The INI is missing the double quote.
+| The macro does a lot of typing (uses /keypress to type item names) and can flake on non-English keyboards
+|
+|
+| - Potential Adds:
+| Support minimal profit; Add percentage to when setting to vendor buy price.
+| Support adding vendorprice to INI
+|
+
+|-------------------
+| Updated 2023.8.20 - Doc James
+| Version 2023.8.20.1
+| Fixed: Trader population delay to account for latest patch. This will prevent failure to item search / price correct when starting macro
+
+
+|Optional File For Custom Instructions
+#include_optional bazaar_custom.inc
+
+#warning
+
+#Event searchFound "There are #1# Buy Lines that match the search string '#2#'."
+
+#DEFINE MSG_All "/docommand ${If[${LogLevel}>=0,${If[${LogLevel}>=3,/echo \ar[\a-gBazaar3\ar]\aw>\a-gA\aw:${Macro.CurLine}:\ap${thisItemCleanName}\ay:,/echo \ar[\a-gBazaar3\ar]\aw>\ay:\ap${thisItemCleanName}\ay:]},/squelch ]}"
+#DEFINE MSG_INFO "/docommand ${If[${LogLevel}>=1,${If[${LogLevel}>=3,/echo \ar[\a-gBazaar3\ar]\aw>\a-gI\aw:${Macro.CurLine}:\ap${thisItemCleanName}\ay:,/echo \ar[\a-gBazaar3\ar]\aw>\ay:\ap${thisItemCleanName}\ay:]},/squelch ]}"
+#DEFINE MSG_NOTICE "/docommand ${If[${LogLevel}>=2,${If[${LogLevel}>=3,/echo \ar[\a-gBazaar3\ar]\aw>\a-gN\aw:${Macro.CurLine}:\ap${thisItemCleanName}\ay:,/echo \ar[\a-gBazaar3\ar]\aw>\ay:\ap${thisItemCleanName}\ay:]},/squelch ]}"
+#DEFINE MSG_DEBUG "/if (${LogLevel}>=3) /echo \ar[\a-gBazaar3\ar]\aw>\a-gD\aw:${Macro.CurLine}:\ap${thisItem}\ay:"
+#DEFINE MSG_VERBOSE "/if (${LogLevel}>=4) /echo \ar[\a-gBazaar3\ar]\aw>\a-gD\aw:${Macro.CurLine}:\ap${thisItem}\ay:"
+
+|-------------------------------------------------------------|
+| Main
+|-------------------------------------------------------------|
+Sub Main
+	/call general_Declares
+	/call general_Check_Subscription Gold
+	/call general_Where_Am_I
+	/call general_loadPlugins
+
+    /if (${Macro.Params}) {
+		MSG_DEBUG There is ${Macro.Params} command line parameter(s)
+		/if (${Param0.Equal[goOffline]}) {
+			MSG_DEBUG Go Offline after price scan called from command line.
+			/varset GoOfflineMode TRUE
+		} else /if (${Param0.Equal[Review]}) {
+			MSG_DEBUG Set Review Mode.
+			/varset BuyerReview TRUE
+			/varset SellerReview TRUE
+		} else {
+			MSG_DEBUG Invalid Paramater Given: ${Param0}
+		}
+    }
+	MSG_All ------------------------------------------------
+	MSG_All Version: ${VersionNum}
+	MSG_All You will need to make a pause hotkey!
+	MSG_All Simple hotkey to pause and unpause. /mqp
+	MSG_All 
+	MSG_All This script demands control of your UI.
+	MSG_All ------------------------------------------------
+	/if (${PauseOnStart}) {
+		MSG_All \a-y Any new /trader items will default to: ${InitialPrice}pp
+		MSG_All 
+		MSG_All \a-r This script is currently paused!
+		MSG_All \a-r This gives you a chance to create that hotkey I mentioned.
+		MSG_All \a-r Use your MQPause hotkey to continue.
+		MSG_All \a-r To disable this pause set PauseOnStart to FALSE in your bazaarSettings.ini file.
+		/mqpause on
+	}
+
+    |Custom function on script start
+	/if (${script_initiate}) {
+		MSG_DEBUG Calling Custom: script_initiate
+		/call custom_script_initiate
+	}
+
+	:mainLoop
+	/varset thisItem 
+    |Custom function on new price scan
+	/if (${script_price_scan}) {
+		MSG_DEBUG Calling Custom: custom_script_price_scan
+		/call custom_script_price_scan
+	}
+	/if (${myLocation.Equal[TraderSide]}) {
+		/call trader_Window_Control Open
+		/if (${SafeSeller}) /call trader_Window_Control Off
+		/call trader_Setup
+		/call bazaar_Search_Window_Control Open
+		/call trader_CheckPrices
+		/call trader_ValidatePrices
+		/call trader_Window_Control On
+		/call bazaar_Search_Window_Control Close
+		/call general_goOffline
+		/if (${UpdateOn}) {
+			/varset UpdateInterval ${Math.Calc[${UpdateInterval.OriginalValue}+${Math.Rand[${UpdateDrift.OriginalValue}]}].Int}
+			/while (${UpdateInterval}) {
+				/if (${UpdateSpam} && !${UpdateSpamFrequency}) {
+					MSG_All Prices will be updated in \ar${Int[${Math.Calc[${Math.Calc[${UpdateInterval}/10]}/60]}]} \ayminutes.
+					/varset UpdateSpamFrequency ${UpdateSpamFrequency.OriginalValue}
+				}
+			}
+			/goto :mainLoop
+		}
+	} else /if (${myLocation.Equal[BarterSide]}) {
+		/call buyer_Window_Control Open
+		/call buyer_Setup
+		/call buyer_CheckPrices
+		/call barter_Window_Control Close
+		/call buyer_Window_Control On
+		/call general_goOffline
+		/if (${UpdateOn}) {
+			/varset UpdateInterval ${Math.Calc[${UpdateInterval.OriginalValue}+${Math.Rand[${UpdateDrift.OriginalValue}]}].Int}
+			/while (${UpdateInterval}) {
+				/if (${UpdateSpam} && !${UpdateSpamFrequency}) {
+					MSG_All Prices will be updated in \ar${Int[${Math.Calc[${Math.Calc[${UpdateInterval}/10]}/60]}]} \ayminutes.
+					/varset UpdateSpamFrequency ${UpdateSpamFrequency.OriginalValue}
+				}
+			}
+			/goto :mainLoop
+		}
+	} else {
+		MSG_All \arYou were not on the trader or barter side. Ending Macro!
+		/endmacro
+	}
+
+:OnExit
+	/if (${LogLevel}>=3) {
+		/invoke ${Macro.Undeclared}
+	}
+	MSG_All Macro Ended, Chickens are jerks.
+	MSG_DEBUG Total Runtime: ${Macro.RunTime} seconds.
+	MSG_DEBUG Memory Use: ${Macro.MemUse} kbytes.
+	/endmacro
+/return
+
+|-------------------------------------------------------------|
+| Goes to offline mode if enabled
+|-------------------------------------------------------------|
+Sub general_goOffline
+	/declare delayNotice int local 30
+	/if (${GoOfflineMode}) {
+		MSG_DEBUG Go Offline after price check is enabled - Side ${myLocation}
+		/if (${myLocation.Equal[TraderSide]}) {
+			MSG_DEBUG Waiting for offline button to enable.
+			/delay 30s ${Window[BazaarWnd].Child[BZW_OfflineMode_Button].Enabled}
+			/if (${Window[BazaarWnd].Child[BZW_OfflineMode_Button].Enabled}) {
+				/while (${delayNotice}>0) {
+					MSG_All Seller Going Offline in ${delayNotice} seconds. Use /end to abort.
+					/delay 1s
+					/varcalc delayNotice ${delayNotice} - 1
+				}
+				/notify BazaarWnd BZW_OfflineMode_Button leftmouseup
+				/delay 1s
+				/notify ConfirmationDialogBox CD_Yes_Button leftmouseup
+			} else {
+				MSG_All Error enabling offline mode, Code 3001
+			}
+		}
+		/if (${myLocation.Equal[BarterSide]}) {
+			MSG_DEBUG Waiting for offline button to enable.
+			/delay 30s ${Window[BarterWnd].Child[BTR_OfflineModeButton].Enabled}
+			/if (${Window[BarterWnd].Child[BTR_OfflineModeButton].Enabled}) {
+				/while (${delayNotice}>0) {
+					MSG_All Buyer Going Offline in ${delayNotice} seconds. Use /end to abort.
+					/delay 1s
+					/varcalc delayNotice ${delayNotice} - 1
+				}
+				/notify BarterWnd BTR_OfflineModeButton leftmouseup
+				/delay 1s
+				/notify ConfirmationDialogBox CD_Yes_Button leftmouseup
+			} else {
+				MSG_All Error enabling offline mode, Code 3002
+			}
+		}
+	} else {
+		MSG_DEBUG Go Offline after price check is not enabled
+	}
+/return
+
+|-------------------------------------------------------------|
+| Loads any needed plugins.  I try to keep it lite on dependencies
+|-------------------------------------------------------------|
+Sub general_loadPlugins
+	/if (${CreateShoppingList}) {
+		MSG_NOTICE MQ2Log is enabled
+		/if (!${Bool[${Plugin[MQ2Log].Name.Equal[MQ2Log]}]}) {
+			MSG_NOTICE MQ2Log wasn't loaded, \agloading MQ2Log!
+			/squelch /plugin MQ2Log load noauto
+		}
+	}
+	/if (${UseLuaReview}) {
+		MSG_NOTICE MQ2Lua is enabled
+		/if (!${Bool[${Plugin[MQ2Lua].Name.Equal[MQ2Lua]}]}) {
+			MSG_NOTICE MQ2Lua wasn't loaded, \agloading MQ2Lua!
+			/squelch /plugin MQ2Lua load noauto
+		}
+	}
+/return
+
+|-------------------------------------------------------------|
+| Starts the /buyer mode, setting new items to starting offering
+|-------------------------------------------------------------|
+Sub buyer_Setup
+	/declare CheckIniEntry int local 0
+	MSG_All Setting unpriced items to default price of (\ag${BuyPriceMax}\ay) platinum.
+	| Check if entry has an ini file entry. Create on if missing.
+	MSG_NOTICE Checking all items in list for Bazaar.ini entries.
+	/for CheckIniEntry 1 to 300
+		/if (${Window[BarterWnd].Child[BTR_BuyLineList].List[${CheckIniEntry}].Length}>0) {
+			/varset thisItem ${Window[BarterWnd].Child[BTR_BuyLineList].List[${CheckIniEntry},3]}
+			/call general_Clean_Name
+			/if (!${Ini[bazaar.ini,${thisItem}].Length}) {
+				/ini bazaar.ini "${thisItem}" "BuyPriceMin" "${BuyPriceMin}"
+				/ini bazaar.ini "${thisItem}" "BuyPriceMax" "${BuyPriceMax}"
+				MSG_INFO Created bazaar.ini entry." "${thisItem}"
+				/if (${script_buyer_new_item}) /call custom_script_buyer_new_item
+			}
+		}
+	/next CheckIniEntry
+/return
+
+|-------------------------------------------------------------|
+| Starts the /trader mode, setting new items to starting offering
+|-------------------------------------------------------------|
+Sub trader_Setup
+	/declare slot int local -1
+	/declare curprice string local
+	MSG_INFO Setting unpriced items to default price of (\ag${InitialPrice}\ay) platinum.
+	|** Open the Bazaar Window if it isn't already opened **|
+	/if (!${Window[BazaarWnd].Open}) {
+		MSG_DEBUG Opening Trader Window.
+		/trader
+	}
+	/delay 5s ${Window[BazaarWnd].Open}
+	/delay 5s
+	/for slot 0 to 144
+		/notify BazaarWnd BZR_BazaarSlot${slot} leftmouseup
+		/if (!${Window[BazaarWnd].Child[BZR_BazaarSlot${slot}].Tooltip.Length}) /break
+		/varset thisItem ${Window[BazaarWnd].Child[BZR_BazaarSlot${slot}].Tooltip}
+		/call general_Clean_Name
+		/varset curprice ${Int[${Window[BazaarWnd].Child[BZW_Money0].Text}]}
+		MSG_DEBUG Ensuring Trader Slot ${slot} had an INI entry.
+		/if (!${Ini[bazaar.ini,${thisItem},SellPriceMax].Length}) {
+			MSG_INFO Creating INI entry with default values.
+			/ini ${itemPrices} "${thisItem}" "SellPriceMin" ${SellPriceMin}
+			/ini ${itemPrices} "${thisItem}" "SellPriceMax" ${SellPriceMax}
+			/if (${script_trader_new_item}) /call custom_script_trader_new_item
+		}
+		/if (${curprice} != 0) /continue
+		/if (${Ini[bazaar.ini,${thisItem},SellPriceMax]} == -1) {
+			MSG_NOTICE \aoINI set to skip this item (no default), skipping.
+			/continue
+		}
+		/if (!${curprice}) {
+			MSG_NOTICE Setting to default price \ag${InitialPrice}\ay.
+			/notify BazaarWnd BZW_Money0 leftmouseup
+			/delay 5s ${Window[QuantityWnd].Open}
+			/notify QuantityWnd QTYW_slider newvalue ${InitialPrice}
+			/delay 1
+			/notify QuantityWnd QTYW_Accept_Button leftmouseup
+			/delay 1
+			/notify BazaarWnd BZW_SetPrice_Button leftmouseup
+			/delay 1
+		}
+	/next slot
+/return
+
+|-------------------------------------------------------------|
+| Validates your /trader prices are all above minimal.
+|-------------------------------------------------------------|
+Sub trader_ValidatePrices
+	/declare slot int local -1
+	/for slot 0 to 144
+		/if (${Bool[${Window[BazaarWnd].Child[BZR_BazaarSlot${slot}].Tooltip}]}) {
+			/notify BazaarWnd BZR_BazaarSlot${slot} leftmouseup
+			/varset thisItem ${Window[BazaarWnd].Child[BZR_BazaarSlot${slot}].Tooltip}
+			/call general_Clean_Name
+			/varset currentPrice ${Int[${Window[BazaarWnd].Child[BZW_Money0].Text}]}
+			MSG_NOTICE Validating: - \aoMin: \ag${Ini[${itemPrices},${thisItem},SellPriceMin]}\ao Max: \ag${Ini[${itemPrices},${thisItem},SellPriceMax]}
+			/delay 1
+			|If my Current Price is less than SellPriceMin set new price to SellPriceMin. This should only happen if there was an error
+			/if (${Ini[${itemPrices},${thisItem},SellPriceMin]} >= 1) {
+				/if (${currentPrice} < ${Ini[${itemPrices},${thisItem},SellPriceMin]}) {
+					MSG_All Validating: \arOpps! Something went wrong. Error 496  Priced lower than minimal. Setting to SellPriceMin - Min: \ag${Ini[${itemPrices},${thisItem},SellPriceMin]}\ao Max: \ag${Ini[${itemPrices},${thisItem},SellPriceMax]}
+					/if (!${SafeSeller}) MSG_All Validating: \arIf this issue persists you may wish to enable SafeTrader.
+					/varset newPrice ${Ini[${itemPrices},${thisItem},SellPriceMin]}
+					/call trader_UpdatePrice ${newPrice}
+					/if (${script_trader_validationError}) /call custom_script_trader_validationError
+				}
+			}
+			|Make sure the minimal is at least one platinum
+			/if (${Ini[${itemPrices},${thisItem},SellPriceMin]} != -1) {
+				/if (${currentPrice} == 0) {
+					MSG_All Validating: \arOpps! Something went wrong. Error 505  Priced lower than one platnium. Setting to SellPriceMin - Min: \ag${Ini[${itemPrices},${thisItem},SellPriceMin]}\ao Max: \ag${Ini[${itemPrices},${thisItem},SellPriceMax]}
+					/if (!${SafeSeller}) MSG_All Validating: \arIf this issue persists you may wish to enable SafeTrader.
+					/varset newPrice ${Ini[${itemPrices},${thisItem},SellPriceMin]}
+					/call trader_UpdatePrice ${newPrice}
+					|Custom fuction on script start
+					/if (${script_initiate}) {
+						MSG_DEBUG Calling Custom: custom_script_trader_validationError
+						/call custom_script_trader_validationError
+					}
+				}
+			}
+		}
+	/next slot
+/return
+
+|-------------------------------------------------------------|
+| Cycles through your /buyer lines
+|-------------------------------------------------------------**|
+Sub buyer_CheckPrices
+	/declare BuyItemSlot int local 0
+	/declare CheckIniEntry int local 0
+	/declare minBuyPrice int local
+	/declare maxBuyPrice int local
+	/declare minSellPrice int local
+	/declare maxSellPrice int local
+
+	/varset thisItem
+	
+	MSG_INFO Scanning Barter...
+	/if (${BuyerReview}) MSG_NOTICE Barter Review Mode is: ${BuyerReview}
+	/for BuyItemSlot 1 to 300
+		/if (${Window[BarterWnd].Child[BTR_BuyLineList].List[${BuyItemSlot}].Length}>0) {
+			/varset thisItem ${Window[BarterWnd].Child[BTR_BuyLineList].List[${BuyItemSlot},3]}
+			/call general_Clean_Name
+			MSG_DEBUG "Item found in buy slot ${BuyItemSlot}"
+			/if (${Ini[bazaar.ini,${thisItem}].Length}) {
+				/varset minBuyPrice ${Ini[bazaar.ini,${thisItem},BuyPriceMin]}
+				/varset maxBuyPrice ${Ini[bazaar.ini,${thisItem},BuyPriceMax]}
+			} else {
+				/varset minBuyPrice ${BuyPriceMin}
+				/varset maxBuyPrice ${BuyPriceMax}
+			}
+			|Skip if BuyPriceMax is negative one
+			/if (${Ini[${itemPrices},${thisItem},BuyPriceMax]} == -1) {
+				MSG_NOTICE \aoINI set to skip this item, skipping.
+				/continue
+			}
+			/call barter_UpdateBuyerPrice ${minBuyPrice} ${maxBuyPrice}
+		}
+		/if (${Ini[bazaar.ini,${thisItem}].Length}) {
+			/varset minSellPrice ${Ini[bazaar.ini,${thisItem},SellPriceMin]}
+			/varset maxSellPrice ${Ini[bazaar.ini,${thisItem},SellPriceMax]}
+		}
+		/if (${BuyerReview}) /call general_INIReviewInterface
+		/if (${LogLevel}>=4 && !${BuyerReview}) {
+			MSG_VERBOSE Verbose Logging Enabled, Pausing so you may read the spam.
+			/mqpause on
+		}
+	/next BuyItemSlot
+/return
+
+|-------------------------------------------------------------|
+| Checks your /trader prices and updates if needed.
+|-------------------------------------------------------------**|
+Sub general_INIReviewInterface
+	/if (${UseLuaReview}) {
+		/lua stop editBazaar.lua
+	}
+	/declare displayValue string local
+	/delay 2
+	MSG_All ----------------------------------------
+	/if (${FindItemCount[=${thisItem}]}) {
+		MSG_All Merchant Value: ${Math.Calc[${FindItem[${thisItem}].Value}/1000]}pp
+		MSG_All Tribute Value: ${FindItem[${thisItem}].Tribute}
+	}
+	MSG_All 
+
+	/if (${Ini[${itemPrices},${thisItem},SellPriceMin]}) {
+		/varset displayValue "\a-t${Ini[${itemPrices},${thisItem},SellPriceMin]}\axpp"
+	} else /varset displayValue \a-oNot Set\ax
+	MSG_All Your SellPriceMin: ${displayValue}
+
+	/if (${Ini[${itemPrices},${thisItem},SellPriceMax]}) {
+		/varset displayValue "\at${Ini[${itemPrices},${thisItem},SellPriceMax]}\axpp"
+	} else /varset displayValue \a-oNot Set\ax
+	MSG_All Your SellPriceMax: ${displayValue}
+
+	/if (${Ini[${itemPrices},${thisItem},BuyPriceMin]}) {
+		/varset displayValue "\a-t${Ini[${itemPrices},${thisItem},BuyPriceMin]}\axpp"
+	} else /varset displayValue \a-oNot Set\ax
+	MSG_All Your BuyPriceMin: ${displayValue}
+
+	/if (${Ini[${itemPrices},${thisItem},BuyPriceMax]}) {
+		/varset displayValue "\at${Ini[${itemPrices},${thisItem},BuyPriceMax]}\axpp"
+	} else /varset displayValue \a-oNot Set\ax
+	MSG_All Your BuyPriceMax: ${displayValue}
+
+	/if (${Ini[${itemPrices},${thisItem},MinBuyCount]}) {
+		/varset displayValue "\am${Ini[${itemPrices},${thisItem},MinBuyCount]}\ax"
+	} else /varset displayValue \a-oNot Set\ax
+	MSG_All Your MinBuyCount: ${displayValue}
+
+	/if (${Ini[${itemPrices},${thisItem},SellPriceMin]}>1 && ${Ini[${itemPrices},${thisItem},BuyPriceMax]}) {
+		MSG_All Your minimal flipping profit: \ag${Math.Calc[${Ini[${itemPrices},${thisItem},SellPriceMin]}-${Ini[${itemPrices},${thisItem},BuyPriceMax]}].Milli}\axpp
+	}
+	/if (${UseLuaReview}) {
+		MSG_All Running Lua UI
+		/lua run editBazaar.lua Bazaar.ini "${thisItem}"
+	}
+	/if (${myLocation.Equal[BarterSide]}) {
+		/if (${BuyerReview}) /call general_BazaarSearch "${thisItem}"
+	}
+	/mqpause on
+	/if (${myLocation.Equal[TraderSide]}) {
+		/if (${SellerReview}) /ini ${itemPrices} "${thisItem}" "SellerReview" "Last Review ${Time.Year}.${Time.Month}.${Time.Day}"
+	}
+	/if (${myLocation.Equal[BarterSide]}) {
+		/if (${BuyerReview}) /ini ${itemPrices} "${thisItem}" "BuyerReview" "Last Review ${Time.Year}.${Time.Month}.${Time.Day}"
+	}
+/return
+
+|-------------------------------------------------------------|
+| Checks your /trader prices and updates if needed.
+|-------------------------------------------------------------**|
+Sub trader_CheckPrices
+	/declare slot int local -1
+	/declare dupCheck int local
+	/declare searchResult int local
+	/declare lowestPrice int local
+	/declare found int local 0
+	/declare dataWaitVar int local 0
+	/declare Excludelist string local
+	/declare ShopingListMin int local 2000000
+	/declare ShopingListMax int local 0
+	/declare ShopingListRunning int local 0
+	/declare workingValue int local 0
+
+	MSG_DEBUG Checking current prices.
+	/if (${SellerReview}) MSG_NOTICE Seller Review Mode is: ${SellerReview}
+
+	/if (!${AggressiveSeller}) { 
+		MSG_INFO Undercutting all other vendors by \ag${UndercutPct}%
+	} else {
+		MSG_INFO Undercutting all other vendors by \ag${UndercutAmount}\ay platinum.
+	}
+	
+	/for slot 0 to 144
+		MSG_DEBUG Scanning Trader Slot ${slot}
+		/varset lowestPrice 2000000
+		/varset ShopingListMin 2000000
+		/varset ShopingListMax 0
+		/varset ShopingListRunning 0
+		/notify BazaarWnd BZR_BazaarSlot${slot} leftmouseup
+		/varset thisItem ${Window[BazaarWnd].Child[BZR_BazaarSlot${slot}].Tooltip}
+		/call general_Clean_Name
+		/varset currentPrice ${Window[BazaarWnd].Child[BZW_Money0].Text}
+
+		/if (!${Window[BazaarWnd].Child[BZR_BazaarSlot${slot}].Tooltip.Length}) /break
+		/if (${Bool[${Window[BazaarWnd].Child[BZR_BazaarSlot${slot}].Tooltip}]}) {
+			|Check if this item should be skipped
+			/if (${Ini[${itemPrices},${thisItem},SellPriceMax]} == -1) {
+				MSG_NOTICE \aoINI set to skip this item, skipping.
+				/varset SkipItem TRUE
+			}
+			/if (${slot}) {
+				/for dupCheck 0 to ${Math.Calc[${slot}-1]}
+					/if (${Window[BazaarWnd].Child[BZR_BazaarSlot${dupCheck}].Tooltip.Equal[${thisItem}]}) {
+						MSG_NOTICE \aoPreviously checked, skipping.
+						/varset SkipItem TRUE
+					}
+				/next dupCheck
+			}
+			/if (${SkipItem}) {
+				/varset SkipItem FALSE
+				/continue
+			}
+			/varset SellerFound FALSE
+			/notify BazaarWnd BZR_BazaarSlot${slot} leftmouseup
+			/delay 5
+			MSG_DEBUG Your current asking price is (\ag${currentPrice}\ax)
+			MSG_NOTICE Checking item. Your \aoMin: \ag${Ini[${itemPrices},${thisItem},SellPriceMin]}\ay - \aoMax: \ag${Ini[${itemPrices},${thisItem},SellPriceMax]}
+			|If my Current Price is less than SellPriceMin set new price to SellPriceMin
+			/if (${Ini[${itemPrices},${thisItem},SellPriceMin]} != 1) {
+				/if (${currentPrice} < ${Ini[${itemPrices},${thisItem},SellPriceMin]}) {
+					MSG_DEBUG The price was less than SellPriceMin: ${Ini[${itemPrices},${thisItem},SellPriceMin]}
+					/varset newPrice ${Ini[${itemPrices},${thisItem},SellPriceMin]}
+				}
+			}
+			|If you have a max price, default to that.  Profits First!
+			/if (${Ini[${itemPrices},${thisItem},SellPriceMax]} != 1) {
+					MSG_DEBUG Setting starting price to SellPriceMax: (\ag${Ini[${itemPrices},${thisItem},SellPriceMax]}\ay)
+				/varset newPrice ${Ini[${itemPrices},${thisItem},SellPriceMax]}
+			} else {
+				MSG_DEBUG Your SellPriceMax not set. Using current starting price: (\ag${currentPrice}\ay)
+				/varset newPrice ${currentPrice}
+			}
+			MSG_VERBOSE Checking in seller review is enabled
+			|-------/call general_BazaarSearch
+			|/call general_BazaarSearch "${thisItem}" ${slot}
+			/call general_BazaarSearch ${slot}
+			|Lets make sure we have some results
+			/varset found 0
+			/for dataWaitVar 1 to ${SearchWaitTime}
+				/varset found ${Window[BazaarSearchWnd].Child[BZR_ItemList].List[1,3]}
+				/delay 5
+				/if (${found}>0) /break
+			/next dataWaitVar
+			/if (${dataWaitVar} >=${SearchWaitTime}) {
+				MSG_All Notice! No search results returned.
+				MSG_INFO If this was a common item you may wish to consider increasing your SearchWaitTime 
+			}
+			MSG_DEBUG Waited ${dataWaitVar} cycles for Sellers
+			/for searchResult 1 to 255
+				/if (${Bool[${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},3]}]}) {
+					/if (${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},2].Equal[${thisItem}]}) {
+						/if (!${Ini[${BazINI},Excludes,ExcludeList].Find[${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},8]}]}) {
+							|Fix for commas in bazaar window
+							/varset workingValue ${noComma[ ${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},4]}]}
+							/if (${Ini[${itemPrices},${thisItem},SellPriceMin]} <= ${workingValue}) {
+								MSG_DEBUG \am${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},8]}'s\ay price is (\ag${workingValue}\ay)
+								/varset SellerFound TRUE
+								/if (${lowestPrice} > ${workingValue}) {
+									/varset lowestPrice ${workingValue} 
+									MSG_DEBUG \am${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},8]}'s\ay price (\ag${workingValue}\ay) is now current lowest qualified.
+								}
+							} else {
+								MSG_DEBUG \am${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},8]}'s\a-y price (\ag${workingValue}\a-y) was lower than SellPriceMin. Ignoring Trader
+							}
+							/if (${workingValue}>${ShopingListMax}) /varset ShopingListMax ${workingValue}
+							/if (${workingValue}<${ShopingListMin}) /varset ShopingListMin ${workingValue}
+							/varcalc ShopingListRunning ${ShopingListRunning}+${workingValue}
+						} else {
+							MSG_NOTICE \am${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},8]}\aw was on the Excluded Traders list.
+						}
+					} else {
+						MSG_DEBUG \a-y${Window[BazaarSearchWnd].Child[BZR_ItemList].List[${searchResult},2]} is not the same as ${thisItem}
+					}
+				} else {
+					/break
+				}
+				/delay 10s ${Window[BazaarSearchWnd].Child[BZR_QueryButton].Enabled}
+			/next searchResult
+		} else {
+			MSG_DEBUG No more items to check. Finished updating prices.
+			/break
+		}
+
+		/if (!${SellerFound}) {
+			|What to do if there are no other sellers.
+			/if (${Ini[${itemPrices},${thisItem},SellPriceMax]} != 1) {
+				/if (${newPrice} < ${Ini[${itemPrices},${thisItem},SellPriceMax]}) {
+					/varset newPrice ${Ini[${itemPrices},${thisItem},SellPriceMax]}
+					MSG_DEBUG Proposed new price is: (\ag${newPrice}\ay) (Your SellPriceMax)
+				}
+			}
+		} else {
+			| A Seller was found.
+			| Do we have custom price controls in place
+			/if (${script_trader_price_controls}) {
+				/varset newPrice ${custom_script_trader_price_controls[${lowestPrice}]}
+			} else {
+				/if (!${AggressiveSeller}) { 
+					/varcalc newPrice ${lowestPrice}-${Math.Calc[${lowestPrice}*0.${UndercutPct}]}
+					/if (${newPrice} > 100) {
+						/call general_roundDown
+					}
+				} else {
+					/varcalc newPrice ${lowestPrice} - ${UndercutAmount}
+				}
+			}
+			|Make sure we are selling within our set parameters
+			MSG_DEBUG Proposed new asking price is: (\ag${newPrice}\ay)
+			/if (${Ini[${itemPrices},${thisItem},SellPriceMin]} != 1) {
+				/if (${newPrice} < ${Ini[${itemPrices},${thisItem},SellPriceMin]}) {
+					MSG_DEBUG The proposed price of was less than SellPriceMin: (\ag${Ini[${itemPrices},${thisItem},SellPriceMin]}\ax) - Increasing to SellPriceMin
+					/varset newPrice ${Ini[${itemPrices},${thisItem},SellPriceMin]}
+				}
+			}
+			/if (${Ini[${itemPrices},${thisItem},SellPriceMax]} != 1) {
+				/if (${newPrice} > ${Ini[${itemPrices},${thisItem},SellPriceMax]}) {
+					MSG_DEBUG Proposed price was greater than SellPriceMax: (\ag${Ini[${itemPrices},${thisItem},SellPriceMax]}\ax) - Decreasing to SellPriceMax
+					/varset newPrice ${Ini[${itemPrices},${thisItem},SellPriceMax]}
+				}
+			}
+		}
+
+		|Make sure we are selling it for more than what a vendor will pay
+		MSG_VERBOSE Verifing a vendor won't just pay more.
+		/if (${Int[${FindItem[${thisItem}].Value}]} > 1001) {
+			MSG_VERBOSE Vendor value is greater than 1pp
+			/if (${Int[${Math.Calc[${FindItem[${thisItem}].Value}/1000]}]} > ${newPrice}) {
+				MSG_NOTICE Proposed price was less than Vendor Purchase price: (\ag${Int[${Math.Calc[${Int[${Math.Calc[${FindItem[${thisItem}].Value}/1000]}]}+1]}]}\ax) - Beating Vendor Price.
+				/varset newPrice ${Int[${Math.Calc[${Int[${Math.Calc[${FindItem[${thisItem}].Value}/1000]}]}+1]}]}
+			}
+		}
+
+		/if (${newPrice} != ${currentPrice}) {
+			/if (${currentPrice}<${newPrice}) {
+				MSG_INFO \agIncreasing\ao price from (\aw${currentPrice}\ao) to (\ag${newPrice}\ao)
+			} else {
+				MSG_INFO \arDecreasing\ao price from (\aw${currentPrice}\ao) to (\ar${newPrice}\ao)
+			}
+			/call trader_UpdatePrice ${newPrice}
+		} else {
+			MSG_DEBUG Current price (\ag${currentPrice}\ay) is the same as the proposed price (\ag${newPrice}\ay).
+		}
+		/varset lowestPrice 0
+		/if (${LogLevel}>=4 && !${SellerReview}) {
+			MSG_VERBOSE Verbose Logging Enabled, Pausing so you may read the spam.
+			/mqpause on
+		}
+		/if (${SellerReview}) /call general_INIReviewInterface
+		|----------- Write to shopping list
+		/if (${CreateShoppingList}) {
+			/mqlogcustom bazaar3_${EverQuest.Server}_Shopping_List.cvs ${Time.Date};${Time};seller;${Me.Name};"${thisItem}";${ShopingListMin};${ShopingListMax};${Math.Calc[${ShopingListRunning}/${searchResult}]};0;0;0;${Ini[${itemPrices},${thisItem},SellPriceMin]};${Ini[${itemPrices},${thisItem},SellPriceMax]};${Ini[${itemPrices},${thisItem},BuyPriceMin]};${Ini[${itemPrices},${thisItem},BuyPriceMax]};${Ini[${itemPrices},${thisItem},MinBuyCount]}
+		}
+	/next slot
+/return
+
+|-------------------------------------------------------------|
+| Remove commas from screen scrape
+|-------------------------------------------------------------|
+Sub noComma(var1,var2,var3)
+    /return ${String[${var1}${var2}${var3}].Replace[p,]}
+/return
+
+|-------------------------------------------------------------|
+| Round to down nearest 5 or 10 Not the cleanest
+|-------------------------------------------------------------|
+Sub general_roundDown
+	/declare lastDigit string local
+		MSG_VERBOSE Value Rounding Started at: ${newPrice}
+		/varset lastDigit ${newPrice}
+		/varset lastDigit ${lastDigit.Right[1]}
+		/if (${lastDigit} == 9) /varcalc newPrice ${newPrice} - 4
+		/if (${lastDigit} == 8) /varcalc newPrice ${newPrice} - 3
+		/if (${lastDigit} == 7) /varcalc newPrice ${newPrice} - 2
+		/if (${lastDigit} == 6) /varcalc newPrice ${newPrice} - 1
+		/if (${lastDigit} == 4) /varcalc newPrice ${newPrice} - 4
+		/if (${lastDigit} == 3) /varcalc newPrice ${newPrice} - 3
+		/if (${lastDigit} == 2) /varcalc newPrice ${newPrice} - 2
+		/if (${lastDigit} == 1) /varcalc newPrice ${newPrice} - 1
+		MSG_VERBOSE Value Rounding Ended at: ${newPrice}
+/return
+
+|-------------------------------------------------------------|
+| Updates the /trader price
+|-------------------------------------------------------------|
+Sub trader_UpdatePrice(int price)
+	/declare hDelay int local ${Math.Rand[5,20]}
+	MSG_VERBOSE Human mode Random Delay (Trader Price Set Delay 1): ${hDelay}
+	/if (${BeMoreHuman}) /delay ${hDelay}
+	/notify BazaarWnd BZW_Money0 leftmouseup
+	/delay 2s ${Window[QuantityWnd].Open}
+	/notify QuantityWnd QTYW_Slider newvalue ${price}
+	/notify QuantityWnd QTYW_Accept_Button leftmouseup
+	/notify BazaarWnd BZW_SetPrice_Button leftmouseup
+
+	|Lets make sure the price got updated.  If not try again
+	/if (!${Window[BazaarWnd].Child[BZW_Money0].Text.Equal[${price}]}) {
+		MSG_All \arOpps! This is embarrassing.
+		/notify BazaarWnd BZW_Money0 leftmouseup
+		/delay 2s ${Window[QuantityWnd].Open}
+		/notify QuantityWnd QTYW_Slider newvalue ${price}
+		/notify QuantityWnd QTYW_Accept_Button leftmouseup
+		/notify BazaarWnd BZW_SetPrice_Button leftmouseup
+	}
+	/varset hDelay ${Math.Rand[1,20]}
+	MSG_VERBOSE Human mode Random Delay (Trader Price Set Delay 2): ${hDelay}
+	/if (${BeMoreHuman}) /delay ${hDelay}
+/return
+
+|-------------------------------------------------------------|
+| Search /bazaar for item
+|-------------------------------------------------------------|
+Sub general_BazaarSearch(int slot)
+	/declare hDelay int local ${Math.Rand[5,20]}
+	/call bazaar_Search_Window_Control Open
+	MSG_DEBUG Local Slot Int: ${slot}
+	MSG_VERBOSE Human mode Random Delay (Bazaar SearchDelay 1): ${hDelay}
+	/if (${BeMoreHuman}) /delay ${hDelay}
+	/if (${myLocation.Equal[TraderSide]}) {
+		MSG_VERBOSE Using Ctrl Click to search.
+|		/ctrl /shift /notify BazaarWnd BZR_BazaarSlot${FindItem[=${itemName}].ItemSlot} leftmouseup
+		/ctrl /shift /notify BazaarWnd BZR_BazaarSlot${slot} leftmouseup
+		/delay 3s
+		/varset hDelay ${Math.Rand[1,20]}
+		MSG_VERBOSE Human mode Random Delay (Trader Price Set Delay 2): ${hDelay}
+		/if (${BeMoreHuman}) /delay ${hDelay}
+	} else {
+		MSG_VERBOSE Beginning bazaar search. Using MQ2Bzsrch Plugin.
+		/if (!${Bool[${Plugin[MQ2bzsrch].Name.Equal[MQ2bzsrch]}]}) {
+			MSG_NOTICE \arMQ2bzsrch wasn't loaded, \agloading MQ2bzsrch!
+			/squelch /plugin MQ2bzsrch load noauto
+			/delay 2s
+		}
+		/breset
+		/bzsrch ${thisItem.Lower}
+		/delay 1s
+		/while (!${Bazaar}) {
+			/delay 1s
+		}
+		| If there are no results shown try again
+		/if (!${Window[BazaarSearchWnd].Child[BZR_ItemList].List[1,3]}) /bzquery
+	}
+/return
+
+|-------------------------------------------------------------|
+| Search /barter for item
+|-------------------------------------------------------------|
+Sub barter_Search
+	/declare hDelay int local ${Math.Rand[5,25]}
+	/call barter_Window_Control Open
+	MSG_DEBUG Waiting for barter search button.
+	/delay 10s ${Window[BarterSearchWnd].Child[BTRSRCH_SearchButton].Enabled}==TRUE
+	MSG_DEBUG Clearing barter search text
+	/notify BarterSearchWnd BTRSRCH_ItemSearchEdit leftmouseup
+	/while (${Window[BarterSearchWnd].Child[BTRSRCH_ItemSearchEdit].Text.Length}>0) {
+		MSG_VERBOSE Deleteing barter letters.
+		/ctrlkey /shiftkey /keypress home chat
+		/delay 5
+		/ctrlkey /shiftkey /keypress delete chat
+		/delay 5
+	}
+	/call general_TypeIn "${thisItem}"
+	|/notify BarterSearchWnd BTRSRCH_ItemSearchEdit ${SelectedItem.Name}
+
+	MSG_VERBOSE Human mode Random Delay (Barter Search Set Delay 1): ${hDelay}
+	/if (${BeMoreHuman}) /delay ${hDelay}
+	MSG_VERBOSE Clicking Barter Search Button
+	/notify BarterSearchWnd BTRSRCH_SearchButton leftmouseup
+/return
+
+Sub barter_SetBuyCount
+	/declare MinBuyCount int local -1
+	/declare MinBuyCountAllowed int local -1
+	/declare currentBuyCount int local -1
+	/declare listID int local 0
+	/declare loopVar int local 0
+	
+	/call barter_Window_Control Open
+	/if (${Ini[bazaar.ini,${thisItem},MinBuyCount]}) /varset MinBuyCount ${Ini[bazaar.ini,${thisItem},MinBuyCount]}
+	/if (${MinBuyCount} <=0) {
+		MSG_VERBOSE No MinBuyCount found.
+		/return
+	}
+	MSG_DEBUG MinBuyCount set to ${MinBuyCount}.
+	/varset listID ${Window[BarterWnd].Child[BTR_BuyLineList].List[=${thisItem},3]}
+	/varset currentBuyCount ${Window[BarterWnd].Child[BTR_BuyLineList].List[${listID},4]}
+	MSG_VERBOSE Current buy count is ${currentBuyCount}.
+	/varcalc MinBuyCountAllowed ${MinBuyCount}-(${MinBuyCount}*0.${BuyCountReset})
+	MSG_VERBOSE Minimal buy count needed before reset: ${MinBuyCountAllowed}.
+	
+	/if (${currentBuyCount} <= ${MinBuyCountAllowed}) {
+		/call buyer_Window_Control Off
+		/notify BarterWnd BTR_BuyLineList listselect ${listID}
+		/delay 5
+		/notify BarterWnd BTR_CountEdit leftmouseup
+		/delay 1
+		|Clear current value
+		/for loopVar 1 to 4
+			/keypress backspace chat
+		/next loopVar
+		|Enter MinBuyCount
+		/call general_TypeIn ${MinBuyCount}
+		/delay 1
+		/notify BarterWnd BTR_BuyLineModifyButton leftmouseup
+	} else {
+		MSG_DEBUG Current buy count is higher than minimal buy count of ${MinBuyCount}.
+	}
+/return
+
+|-------------------------------------------------------------|
+| Checks the /buyer line to see if prices need updating
+|-------------------------------------------------------------**|
+Sub barter_UpdateBuyerPrice(int min, int max)
+	/declare loopVar int local 0
+	/declare dataWaitVar int local 0
+	/declare loopVarMax int local 0
+	/declare maxFoundPrice int local ${min}
+	/declare searchResult string local
+	/declare found int local 0
+	/declare pricedInPlat bool local FALSE
+	/declare buyer string local
+	/declare inSlot int local 0
+	/declare Excludelist string local
+	/declare ShopingListMin int local 2000000
+	/declare ShopingListMax int local 0
+	/declare ShopingListRunning int local 0
+	/declare hDelay int local ${Math.Rand[5,15]}
+	/declare validBuyers int local 0
+	/varset searchFoundVar -1
+
+	|Set the current maxFound to your minimum
+	/varset maxFoundPrice ${min}
+
+	MSG_DEBUG Update Buyer Called.
+:begin
+	MSG_NOTICE Checking...
+	/doevents flush
+	/call barter_Search
+	/call barter_SetBuyCount
+
+	MSG_DEBUG Waiting for barter search results
+	/for loopVar 1 to 200
+		/doevents
+		/if (${searchFoundVar} >= 0 ) /break
+		/delay 1
+	/next loopVar
+	MSG_DEBUG Waited ${loopVar} cycles for Barter search results; Got ${searchFoundVar} results.
+	|If there was a issue with the barter search, try it again
+	/if (${searchFoundVar}<0) {
+		MSG_INFO \ar Issue found with barter search, trying again.
+		/goto :begin
+	}
+	MSG_VERBOSE Human mode Random Delay (Buyer Update Price Set Delay 1): ${hDelay}
+	/if (${BeMoreHuman}) /delay ${hDelay}
+
+	|If there is 1 or more buy lines, find the highest offer.
+	/if (${searchFoundVar}!=0 ) {
+		|Check to ensure the barter window filled with data. Loops to see if line one exists. I'm sure there is a better way.
+		MSG_DEBUG Waiting for barter list to fill.
+		/for loopVar 1 to 200
+			/varset searchResult ${Window[BarterSearchWnd].Child[BTRSRCH_BuyLineList].List[1,2]}
+			/if (${searchResult.Length}>0) /break
+			/delay 1
+		/next loopVar
+		|Added 2021.08.15  Barter Search List was sometimes taking too long to load.
+		/delay 1s		
+		MSG_DEBUG Waited ${loopVar} cycles for Barter to fill.
+
+		/for loopVar 1 to ${searchFoundVar}
+			|Let make sure we can pull something from here.  Helps prevent setting to your lowest offer when others are offering more.
+			/varset found 0
+			/varset searchResult ${Window[BarterSearchWnd].Child[BTRSRCH_BuyLineList].List[${loopVar},2]}
+			/varset searchResult ${searchResult.Mid[1, ${Math.Calc[${searchResult.Find["("]}-1]}]}
+			
+			/varset buyer ${Window[BarterSearchWnd].Child[BTRSRCH_BuyLineList].List[${loopVar},5]}
+			|Tell us if the buyer is on the excluded list
+			/if (${Ini[${BazINI},Excludes,ExcludeList].Find[${buyer}]}) {
+				MSG_NOTICE \am${buyer}\aw was on the Excluded Traders list.
+			}
+			/if (${searchResult.Equal[${thisItem}]} && !${Ini[${BazINI},Excludes,ExcludeList].Find[${buyer}]}) {
+				| Item match, get max plat value
+				/if (${Window[BarterSearchWnd].Child[BTRSRCH_BuyLineList].List[${loopVar},4].Count[p]}) {
+					/varset pricedInPlat TRUE
+					MSG_VERBOSE Platinum Pricing found.
+				}
+				/varset found ${noComma[${Window[BarterSearchWnd].Child[BTRSRCH_BuyLineList].List[${loopVar},4]}]}
+				MSG_NOTICE \am${buyer}\ay has it for (\ag${found}\ay)
+				/if (${found}>=${max}) {
+					MSG_NOTICE \awWe want to beat (\ag${found}\aw), but your maximum is (\ag${max}\aw). Skipping
+				} else {
+					/if (${found}>${maxFoundPrice}) /varset maxFoundPrice ${found}
+					/varcalc validBuyers ${validBuyers}+1
+				}
+				
+				/if (${found}>${ShopingListMax}) /varset ShopingListMax ${found}
+				/if (${found}<${ShopingListMin}) /varset ShopingListMin ${found}
+				/varcalc ShopingListRunning ${ShopingListRunning}+${found}
+			}
+		/next loopVar
+		|If none of the prices found where in platinum, reset maxFound to minBuy
+		|Prevents you from offering 9 platinum when someone is offering 8 gold.
+		/if (!${pricedInPlat}) {
+			MSG_DEBUG All prices found under 1 platinum
+			/varset maxFoundPrice ${min}
+			/varset ShopingListMin 0
+		}
+		MSG_DEBUG The offer to beat is: \ag${maxFoundPrice}
+		|----------- Write to shipping list
+		/if (${CreateShoppingList}) {
+			/declare YourSellPriceMin int local ${Ini[${itemPrices},${thisItem},SellPriceMin]}
+			/declare YourSellPriceMax int local ${Ini[${itemPrices},${thisItem},SellPriceMax]}
+			/declare YourMinBuyCount int local ${Ini[${itemPrices},${thisItem},MinBuyCount]}
+			/mqlogcustom bazaar3_${EverQuest.Server}_Shopping_List.cvs ${Time.Date};${Time};buyer;${Me.Name};"${thisItem}";0;0;0;${ShopingListMin};${ShopingListMax};${Math.Calc[${ShopingListRunning}/${searchFoundVar}]};${YourSellPriceMin};${YourSellPriceMax};${min};${max};${YourMinBuyCount}
+		}
+	}
+
+	|What do we want our price increased by
+	/if (${validBuyers} > 0 && ${pricedInPlat}) {
+		/if (${AggressiveBuyer}) {
+			/varcalc maxFoundPrice ${maxFoundPrice}+1
+		} else {	
+			/if (${maxFoundPrice}<100) {
+				/varcalc maxFoundPrice ${maxFoundPrice}+1
+			} else /if (${maxFoundPrice}<5000) {
+				/varcalc maxFoundPrice ${maxFoundPrice}+5
+			} else {
+				/varcalc maxFoundPrice ${maxFoundPrice}*1.001
+				/varcalc maxFoundPrice ${Int[${Math.Calc[${maxFoundPrice}/5]}]}*5
+			}
+		}
+	}
+
+	MSG_DEBUG Proposed new offer is: (\ag${maxFoundPrice}\ay)
+	|What if the max we want to set is higher than what you want to pay?
+	/if (${maxFoundPrice}>${max}) {
+		MSG_NOTICE \awWe want to set to (\ag${maxFoundPrice}\aw), but your maximum is (\ag${max}\aw).
+		/varset maxFoundPrice ${max}
+	}
+
+	/varset inSlot ${Window[BarterWnd].Child[BTR_BuyLineList].List[=${thisItem},3]}
+	MSG_DEBUG Your current offer is: \ag${Int[${Window[BarterWnd].Child[BTR_BuyLineList].List[${inSlot},5]}]}
+	MSG_DEBUG Your Max: ${max} Your Min: ${min}
+	/if (${maxFoundPrice} != ${Int[${Window[BarterWnd].Child[BTR_BuyLineList].List[${inSlot},5]}]} ) {
+		/call SetBuyerPrice ${maxFoundPrice}
+	}
+	/if (${BuyerReview}) /notify BarterWnd BTR_BuyLineList listselect ${Window[BarterWnd].Child[BTR_BuyLineList].List[=${thisItem},3]}
+/return
+
+|-------------------------------------------------------------|
+| Sets the price of your /buyer line
+|-------------------------------------------------------------**|
+Sub SetBuyerPrice(string price)
+	/declare listID int ${Window[BarterWnd].Child[BTR_BuyLineList].List[=${thisItem},3]}
+	/declare PlatVal int 0
+	/call buyer_Window_Control Off
+	/notify BarterWnd BTR_BuyLineList listselect ${listID}
+	/delay 5
+	/declare currentOffer int local ${Window[BarterWnd].Child[BTR_CompensationPlat].Text}
+	|Make sure it is at least 1 plat until we can support gold
+	/if (${price}<1) {
+		/varset price 1
+		MSG_NOTICE Looks like to want to set to less than 1, changing.
+	}
+
+	/if (${currentOffer}<${price}) {
+		MSG_INFO \arIncreasing\ao offer from (\aw${currentOffer}\ao) to (\ar${price}\ao)
+	} else {
+		MSG_INFO \agDecreasing\ao offer from (\aw${currentOffer}\ao) to (\ag${price}\ao)
+	}
+	/notify BarterWnd BTR_CompensationPlat leftmouseup
+	/delay 1
+:delete
+	/keypress backspace chat
+	/if (${Window[QuantityWnd].Child[QTYW_SliderInput].Text.Length}) /goto :delete
+	/delay 1
+	/for PlatVal 1 to ${price.Length}
+		/keypress ${price.Mid[${PlatVal},1]} chat
+	/next PlatVal
+	/notify QuantityWnd QTYW_Accept_Button leftmouseup
+	/delay 1
+	/notify BarterWnd BTR_BuyLineModifyButton leftmouseup
+/return
+
+|-------------------------------------------------------------|
+| Check if we have barter results
+|-------------------------------------------------------------**|
+Sub Event_searchFound(Line, count)
+	MSG_DEBUG EventLine: ${Line}"
+	/varset searchFoundVar ${count}
+/return
+
+|-------------------------------------------------------------|
+| Enters text into text box
+|-------------------------------------------------------------|
+Sub general_TypeIn(InStr)
+	MSG_DEBUG Typing \ar${InStr}
+	/declare char string local
+	/declare i int local
+	/for i 1 to ${InStr.Length}
+		/varset char ${InStr.Mid[${i},1]}
+		/if (!${char.Length}) {
+			/nomodkey /keypress Space chat
+		} else {
+			/if (${char.Left[1].Equal[(]}) /return
+			/if (${char.Left[1].Equal[)]}) /return
+			/nomodkey /keypress ${char} chat
+		}
+	/next i
+/return
+
+|-------------------------------------------------------------|
+| Manages /buyer window
+|-------------------------------------------------------------|
+Sub buyer_Window_Control(Status)
+	MSG_DEBUG Setting Buyer Window to: ${Status}"
+	/if (${Status.Equal[Open]} || ${Status.Equal[On]} || ${Status.Equal[Off]}) {
+		/if (!${Window[BarterWnd].Open}) {
+			/buyer
+			/delay 2s ${Window[BarterWnd].Open}
+			MSG_DEBUG Opened Buyer Window
+		}
+		/if (${Status.Equal[On]}) {
+			/if (${Window[BarterWnd].Child[BTR_StartStopButton].Text.Equal[Start Barter]}) {
+				/notify BarterWnd BTR_StartStopButton leftmouseup
+				MSG_DEBUG Setting Buyer Window to Start Buying
+			}
+		}
+		/if (${Status.Equal[Off]}) {
+			/if (${Window[BarterWnd].Child[BTR_StartStopButton].Text.Equal[Stop Barter]}) {
+				/notify BarterWnd BTR_StartStopButton leftmouseup
+				MSG_DEBUG Setting Buyer Window to Stop Buying
+			}
+		}
+	} else /if (${Status.Equal[Close]}) {
+		/if (${Window[BarterWnd].Open}) {
+			/windowstate BarterWnd Close
+			MSG_DEBUG Closing Buyer Window
+		}
+	}
+/return
+
+|-------------------------------------------------------------|
+| Manages /barter window
+|-------------------------------------------------------------|
+Sub barter_Window_Control(string Status)
+	MSG_DEBUG Setting Barter Window to: ${Status}
+	/if (${Status.Equal[Open]}) {
+		/if (!${Window[BarterSearchWnd].Open}) {
+			/barter
+			/delay 2s ${Window[BarterSearchWnd].Open}
+			MSG_DEBUG Opened Buyer Search Window
+		}
+	} else /if (${Status.Equal[Close]}) {
+		/if (${Window[BarterSearchWnd].Open}) {
+			/windowstate BarterSearchWnd Close
+			MSG_DEBUG Closed Buyer Search Window
+		}
+	}
+/return
+
+|-------------------------------------------------------------|
+| Manages /bazaar window
+|-------------------------------------------------------------|
+Sub bazaar_Search_Window_Control(string Status) 
+	MSG_DEBUG Setting Bazaar Search Window to: ${Status}
+	/if (${Status.Equal[Open]}) {
+		/if (!${Window[BazaarSearchWnd].Open}) {
+			/bazaar
+			/delay 2s ${Window[BazaarSearchWnd].Open}
+			MSG_DEBUG Opened Bazaar Search Window.
+		}
+	} else /if (${Status.Equal[Close]}) {
+		/if (${Window[BazaarSearchWnd].Open}) {
+			/windowstate BazaarSearchWnd Close
+			MSG_DEBUG Closed Bazaar Search Window.
+		}
+	}
+/return
+
+|-------------------------------------------------------------|
+| Manage /trader window
+|-------------------------------------------------------------**|
+Sub trader_Window_Control(Status)
+	MSG_DEBUG Setting Trader Window to: ${Status}
+	/if (${Status.Equal[Open]} || ${Status.Equal[On]} || ${Status.Equal[Off]}) {
+		/if (!${Window[BazaarWnd].Open}) {
+			/trader
+			/delay 2s ${Window[BazaarWnd].Open}
+			MSG_DEBUG Opened Trader Window
+		}
+		/if (${Status.Equal[On]}) {
+			/if (${Window[BazaarWnd].Child[BZW_Start_Button]}) {
+				/notify BazaarWnd BZW_Start_Button leftmouseup
+				MSG_DEBUG Setting Trader Window to Start Trading.
+			}
+		}
+		/if (${Status.Equal[Off]}) {
+			/if (${Window[BazaarWnd].Child[BZW_End_Button]}) {
+				/notify BazaarWnd BZW_End_Button LeftMouseUp
+				MSG_DEBUG Setting Trader Window to Stop Trading.
+			}
+		}
+	} else /if (${Status.Equal[Close]}) {
+		/if (${Window[BazaarWnd].Open}) {
+			/windowstate BazaarWnd Close
+			MSG_DEBUG Closed Trader Window.
+		}
+	}
+/return
+
+|-------------------------------------------------------------|
+| Checks which side of the Bazaar you are on.
+|-------------------------------------------------------------|
+Sub general_Where_Am_I
+	MSG_DEBUG Checking Your Location
+	/if (${Zone.ID} != 151) {
+		MSG_All \arYou must be in the Bazaar to use this macro. Ending.
+		/end
+	} else {
+		/if (${Range.Between[-1416,-325 : ${Me.X}]} && ${Range.Between[598,1690 : ${Me.Y}]}) {
+			/varset myLocation TraderSide
+			MSG_INFO \ayLocation: \ag${myLocation}
+		}
+		/if (${Range.Between[500,1500 : ${Me.X}]} && ${Range.Between[598,1690 : ${Me.Y}]}) {
+			/varset myLocation BarterSide
+			MSG_INFO \ayLocation: \ag${myLocation}
+		}
+	MSG_DEBUG \ayYour Location: \ag${myLocation}
+	}
+/return
+
+|-------------------------------------------------------------|
+| Subscription Check
+|-------------------------------------------------------------**|
+Sub general_Check_Subscription(RequiredSub)
+	MSG_DEBUG Checking Subscription.
+	/if (!${Me.Subscription.Equal[${RequiredSub}]}) {
+		MSG_All \arYou don't not have a ${RequiredSub} Subscription! Ending Macro.
+		/end
+	}
+/return
+
+|-------------------------------------------------------------|
+| Creates clean display name for logging
+|-------------------------------------------------------------**|
+Sub general_Clean_Name
+	MSG_DEBUG Cleaning the name for display
+	MSG_DEBUG Full Name: ${thisItem}
+	/varset thisItemCleanName
+	/if (${thisItem.Count[,]} >= 1) {
+		/varset thisItemCleanName ${thisItem.Arg[1,,]}${thisItem.Arg[2,,]}
+	} else {
+		/varset thisItemCleanName ${thisItem}
+	}
+/return
+
+|-------------------------------------------------------------|
+| Global Variables
+|-------------------------------------------------------------|
+Sub general_Declares
+	/declare thisItem string outer
+	/declare thisItemCleanName string outer
+	/declare BazINI string outer bazaarSettings.ini
+	/declare itemPrices string outer Bazaar.ini
+	/call general_BazaarSettings
+	/declare myLocation string outer
+	/declare currentPrice int outer
+	/declare newPrice int outer
+	/declare SellerFound bool outer FALSE
+	/declare SkipItem bool outer FALSE
+	/declare searchFoundVar int outer 0
+/return
+
+|-------------------------------------------------------------|
+| Reads your bazaarSetting.ini
+|-------------------------------------------------------------|
+Sub general_BazaarSettings
+	|Added 2020.12.26 LogLevel 0=Shutup 1=Info 2=Notice (Formallly ReportSearching) 3=Debug
+	/if (!${Ini[${BazINI},Settings,LogLevel].Length}) /ini ${BazINI} "Settings" "LogLevel" "2"
+	/declare LogLevel int outer ${Ini[${BazINI},Settings,LogLevel]}
+
+	|Added 2020.12.26 Be nice and give it a real version number
+	/declare VersionNum string outer "2023.8.20.1"
+
+	/if (!${Ini[${BazINI},Excludes,ExcludeList].Length}) /ini ${BazINI} "Excludes" "ExcludeList" "${Me.Name}"
+	/if (!${Ini[${BazINI},Excludes,ExcludeList].Find[${Me.Name}]}) /ini ${BazINI} "Excludes" "ExcludeList" "${Ini[${BazINI},Excludes,ExcludeList]}, ${Me.Name}"
+	MSG_All \ayExcluded Traders: \am${Ini[${BazINI},Excludes,ExcludeList]}
+	
+	/if (!${Ini[${BazINI},Defaults,SellPriceMin].Length}) /ini ${BazINI} "Defaults" "SellPriceMin" "1"
+	/declare SellPriceMin int outer ${Ini[${BazINI},Defaults,SellPriceMin]}
+	
+	/if (!${Ini[${BazINI},Defaults,SellPriceMax].Length}) /ini ${BazINI} "Defaults" "SellPriceMax" "1"
+	/declare SellPriceMax int outer ${Ini[${BazINI},Defaults,SellPriceMax]}
+	
+	/if (!${Ini[${BazINI},Defaults,BuyPriceMin].Length}) /ini ${BazINI} "Defaults" "BuyPriceMin" "1"
+	/declare BuyPriceMin int outer ${Ini[${BazINI},Defaults,BuyPriceMin]}
+	
+	/if (!${Ini[${BazINI},Defaults,BuyPriceMax].Length}) /ini ${BazINI} "Defaults" "BuyPriceMax" "1"
+	/declare BuyPriceMax int outer ${Ini[${BazINI},Defaults,BuyPriceMax]}
+	
+	/if (!${Ini[${BazINI},Settings,UndercutPct].Length}) /ini ${BazINI} "Settings" "UndercutPct" "5"
+	/declare UndercutPct string outer ${Ini[${BazINI},Settings,UndercutPct]}
+	/if (${UndercutPct.Length} == 1) /varset UndercutPct 0${UndercutPct}
+	
+	/if (!${Ini[${BazINI},Defaults,InitialPrice].Length}) /ini ${BazINI} "Defaults" "InitialPrice" "2000000"
+	/declare InitialPrice int outer ${Ini[${BazINI},Defaults,InitialPrice]}
+	
+	/if (!${Ini[${BazINI},Settings,UpdateOn].Length}) /ini ${BazINI} "Settings" "UpdateOn" "TRUE"
+	/declare UpdateOn bool outer ${Ini[${BazINI},Settings,UpdateOn]}
+	
+	/if (!${Ini[${BazINI},Settings,UpdateInterval].Length}) /ini ${BazINI} "Settings" "UpdateInterval" "90"
+	/declare UpdateInterval timer outer ${Ini[${BazINI},Settings,UpdateInterval]}m
+	
+	/if (!${Ini[${BazINI},Spam,UpdateSpam].Length}) /ini ${BazINI} "Spam" "UpdateSpam" "TRUE"
+	/declare UpdateSpam bool outer ${Ini[${BazINI},Spam,UpdateSpam]}
+	
+	/if (!${Ini[${BazINI},Spam,UpdateSpamFrequency].Length}) /ini ${BazINI} "Spam" "UpdateSpamFrequency" "5"
+	/declare UpdateSpamFrequency timer outer ${Ini[${BazINI},Spam,UpdateSpamFrequency]}m
+	
+	/if (!${Ini[${BazINI},Spam,ReportExcluded].Length}) /ini ${BazINI} "Spam" "ReportExcluded" "FALSE"
+	/declare ReportExcluded bool outer ${Ini[${BazINI},Spam,ReportExcluded]}
+	
+	|Added 2020.11.10 to allow for a more random update interval
+	/if (!${Ini[${BazINI},Settings,UpdateDrift].Length}) /ini ${BazINI} "Settings" "UpdateDrift" "10"
+	/declare UpdateDrift timer outer ${Ini[${BazINI},Settings,UpdateDrift]}m
+
+	|Added 2020.11.10 to help review your Bazaar.ini entries
+	/if (!${Ini[${BazINI},Settings,BuyerReview].Length}) /ini ${BazINI} "Settings" "BuyerReview" "FALSE"
+	/declare BuyerReview bool outer ${Ini[${BazINI},Settings,BuyerReview]}
+	
+	|Added 2020.11.10 will increase buying price by 1 plat
+	/if (!${Ini[${BazINI},Settings,AggressiveBuyer].Length}) /ini ${BazINI} "Settings" "AggressiveBuyer" "FALSE"
+	/declare AggressiveBuyer bool outer ${Ini[${BazINI},Settings,AggressiveBuyer]}
+	
+	|Added 2020.11.10 will reduce selling price by UndercutAmount plat
+	/if (!${Ini[${BazINI},Settings,AggressiveSeller].Length}) /ini ${BazINI} "Settings" "AggressiveSeller" "FALSE"
+	/declare AggressiveSeller bool outer ${Ini[${BazINI},Settings,AggressiveSeller]}
+	
+	|Added 2020.11.10 How much aggressive seller will undercut prices.
+	/if (!${Ini[${BazINI},Settings,UndercutAmount].Length}) /ini ${BazINI} "Settings" "UndercutAmount" "1"
+	/declare UndercutAmount int outer ${Ini[${BazINI},Settings,UndercutAmount]}
+	
+	|Added 2020.12.26 Turns seller off during update phase
+	/if (!${Ini[${BazINI},Settings,SafeSeller].Length}) /ini ${BazINI} "Settings" "SafeSeller" "FALSE"
+	/declare SafeSeller bool outer ${Ini[${BazINI},Settings,SafeSeller]}
+
+	|Added 2021.01.29 How many seconds to wait for bazaar search results
+	/if (!${Ini[${BazINI},Settings,SearchWaitTime].Length}) /ini ${BazINI} "Settings" "SearchWaitTime" "30"
+	/declare SearchWaitTime int outer ${Ini[${BazINI},Settings,SearchWaitTime]}
+	
+	|Added 2021.01.29 Pause the script to show important info on start.  Disable when you are cool with how it's running
+	/if (!${Ini[${BazINI},Settings,PauseOnStart].Length}) /ini ${BazINI} "Settings" "PauseOnStart" "TRUE"
+	/declare PauseOnStart bool outer ${Ini[${BazINI},Settings,PauseOnStart]}
+	
+	|Added 2021.01.29 to help review your Bazaar.ini entries
+	/if (!${Ini[${BazINI},Settings,SellerReview].Length}) /ini ${BazINI} "Settings" "SellerReview" "FALSE"
+	/declare SellerReview bool outer ${Ini[${BazINI},Settings,SellerReview]}
+
+	|Added 2021.04.09 Percentage need to increase buycount
+	/if (!${Ini[${BazINI},Settings,BuyCountReset].Length}) /ini ${BazINI} "Settings" "BuyCountReset" "10"
+	/declare BuyCountReset int outer ${Ini[${BazINI},Settings,BuyCountReset]}
+	
+	|Added 2021.04.09 creates a CSV file of searches.  
+	/if (!${Ini[${BazINI},Settings,CreateShoppingList].Length}) /ini ${BazINI} "Settings" "CreateShoppingList" "FALSE"
+	/declare CreateShoppingList bool outer ${Ini[${BazINI},Settings,CreateShoppingList]}
+	
+	|Added 2021.04.16 Go Offline mode when price check is completed.
+	/if (!${Ini[${BazINI},Settings,GoOfflineMode].Length}) /ini ${BazINI} "Settings" "GoOfflineMode" "FALSE"
+	/declare GoOfflineMode bool outer ${Ini[${BazINI},Settings,GoOfflineMode]}
+
+	|Added 2021.05.24 Add humanlike randomness.
+	/if (!${Ini[${BazINI},Settings,BeMoreHuman].Length}) /ini ${BazINI} "Settings" "BeMoreHuman" "FALSE"
+	/declare BeMoreHuman bool outer ${Ini[${BazINI},Settings,BeMoreHuman]}
+
+	|Added 2021.08.11 Add Lua Interface for INI review.
+	/if (!${Ini[${BazINI},Settings,UseLuaReview].Length}) /ini ${BazINI} "Settings" "UseLuaReview" "FALSE"
+	/declare UseLuaReview bool outer ${Ini[${BazINI},Settings,UseLuaReview]}
+	
+	|Added 2022.03.07 Add support for custom functions - Run at script startup
+	/if (!${Ini[${BazINI},Customization_Settings,script_initiate].Length}) /ini ${BazINI} "Customization_Settings" "script_initiate" "FALSE"
+	/declare script_initiate bool outer ${Ini[${BazINI},Customization_Settings,script_initiate]}
+
+	|Added 2022.03.07 Add support for custom functions - Run price scan start
+	/if (!${Ini[${BazINI},Customization_Settings,script_price_scan].Length}) /ini ${BazINI} "Customization_Settings" "script_price_scan" "FALSE"
+	/declare script_price_scan bool outer ${Ini[${BazINI},Customization_Settings,script_price_scan]}
+
+	|Added 2022.03.07 Add support for custom functions - Run when new /buyer item is found
+	/if (!${Ini[${BazINI},Customization_Settings,script_buyer_new_item].Length}) /ini ${BazINI} "Customization_Settings" "script_buyer_new_item" "FALSE"
+	/declare script_buyer_new_item bool outer ${Ini[${BazINI},Customization_Settings,script_buyer_new_item]}
+
+	|Added 2022.03.07 Add support for custom functions - Run if problem during /trader price validation phase
+	/if (!${Ini[${BazINI},Customization_Settings,script_trader_validationError].Length}) /ini ${BazINI} "Customization_Settings" "script_trader_validationError" "FALSE"
+	/declare script_trader_validationError bool outer ${Ini[${BazINI},Customization_Settings,script_trader_validationError]}
+
+	|Added 2022.03.07 Add support for custom functions - Run when new /trader item is found
+	/if (!${Ini[${BazINI},Customization_Settings,script_trader_new_item].Length}) /ini ${BazINI} "Customization_Settings" "script_trader_new_item" "FALSE"
+	/declare script_trader_new_item bool outer ${Ini[${BazINI},Customization_Settings,script_trader_new_item]}
+
+	|Added 2022.09.28 Add support for custom functions - Allows you to set custom pricing rules for your /trader
+	/if (!${Ini[${BazINI},Customization_Settings,script_trader_price_controls].Length}) /ini ${BazINI} "Customization_Settings" "script_trader_price_controls" "FALSE"
+	/declare script_trader_price_controls bool outer ${Ini[${BazINI},Customization_Settings,script_trader_price_controls]}
+/return

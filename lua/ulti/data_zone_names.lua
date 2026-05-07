@@ -1,0 +1,37 @@
+local zoneNames = {}
+
+zoneNames.lines = {
+    'Zone Access and Instance Reference',
+    '',
+    'Ultimate / Avatar flow (Quake):',
+    '- crushbone (instance event)',
+    '- guktop (Upper Guk static)',
+    '- gukbottom (Lower Guk static)',
+    '- sebilis (static)',
+    '- templeveeshan (static)',
+    '- kael (instance)',
+    '- sleeper (static)',
+    '- blackburrow (static)',
+    '- mistmoore (static)',
+    '- soldunga (static)',
+    '- hole (static)',
+    '- frozenshadow (static)',
+    '- veeshan (instance)',
+    '',
+    'Demigod / God flow (Seism):',
+    '- oot (Ocean of Tears static)',
+    '- unrest (static)',
+    '- fearplane (instance)',
+    '- velketor (static)',
+    '- bertoxtemple (Treasure Goblin Vault instance)',
+    '- soldungc (Caverns of Exile expedition)',
+    '- bloodmoon (Bloodmoon Keep expedition)',
+    '- elderforest (Elddar Forest static)',
+    '- oldkurn (Old Kurn\'s Tower static)',
+    '- crystallos (God raid)',
+    '',
+    'Tip:',
+    '- If a zone command works but entry fails, you are missing a progression flag, charm rank flag, or associated prerequisite completion.',
+}
+
+return zoneNames

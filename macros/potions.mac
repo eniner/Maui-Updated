@@ -1,0 +1,922 @@
+|------------------------------------------------------------------------------------
+|	This Macro was created by Villageidiot with help from JimJohnson and
+|	bits and pieces of armysoldiers TS macro's.  Thanks guys!!!
+|
+|       Coding changes and corrections provided by TreeHuginDruid.
+|
+| ***
+| *** This macro is meant to be started in the alchemist room in PoK.
+| *** It is for creating various types of potions.
+| *** Make sure you have some platinum on you!
+| ***
+|------------------------------------------------------------------------------------
+|	USAGE: /mac potions (what to make) (how much)
+|
+|	For example: /mac potions spikes1 20
+|
+|	This would make 20 of the Distillate of skinspikes I then stop
+|	This macro only does (As of right now)  :
+|------------------------------------------------------------------------------------
+|	Distillate of Skinspikes I        	-     spikes1
+| 	Distillate of Skinspikes II      	-     spikes2
+|	Distillate of Skinspikes III     	-     spikes3
+|	Distillate of Skinspikes IV      	-     spikes4
+|	Distillate of Skinspikes V       	-     spikes5
+|	Distillate of Skinspikes VI      	-     spikes6
+|	Philter of Major Translocation   	-     gate
+|       Philter of Unlife Awareness      	-     IVU
+|	Philter of the Wolf I		  	-     sow1
+|	Philter of the Wolf II		 	-     sow2
+|	Philter of the Wolf III		 	-     sow3
+|	Philter of the Wolf IV		  	-     sow4
+|	Philter of the Wolf V		  	-     sow5
+|	Philter of Gulon's Impunity	 	-     levi
+|	Philter of the Ant		  	-     shrink
+|	Distillate of Celestial Healing XVI	-     hotxvi
+|	Distillate of Celestial Healing XV	-     hotxv
+|------------------------------------------------------------------------------------
+
+	/echo Make some potions V1.3  Have you hugged your VillageIdiot lately!?
+	/delay 2s
+	/echo YOU SHOULD!!!!!!!
+
+	#Event OutOfStuff  "#*#Sorry, but you don't have everything you need for this recipe in your general inventory.#*#"
+	#Event CombineMake "#*#You have fashioned the items together to create something new:#*#"
+	#Event CombineFail "#*#You lacked the skills to fashion the items together.#*#"
+	#Event SkillUp     "#*#You have become better at#*#"
+
+	#include Buy.inc
+	#include Common.inc
+
+|--------------------------------------------------------------------------------
+|SUB: Main
+|--------------------------------------------------------------------------------
+	Sub Main
+	/squelch /moveto dist 10
+
+	/if (${Window[TradeskillWnd].Open}) /notify TradeskillWnd CloseButton Leftmouseup
+	/delay 10
+
+	/if (!${Plugin[MQ2Moveutils].Name.Equal[mq2moveutils]}) /squelch /plugin MQ2moveutils nocheck
+	/if (!${Defined[Param0]}) /call Info
+
+|---------------------------------------------------------------------------
+|NOTE: Below section should choose your Alchemy container. as ContainerType
+|---------------------------------------------------------------------------
+	/declare container String Outer
+|---------------------------------------------------------------------------
+	/declare Version 	string 	outer ${Param0}
+	/declare Amount		int 	outer ${Param1}
+	/declare CombAttempts 	int 	outer 0
+	/declare CombMake 	int 	outer 0
+	/declare CombFail 	int 	outer 0
+	/declare PctSuccess 	int 	outer 0
+	/declare Skillups 	int 	outer 0
+|---------------------------------------------------------------------------
+	/if (${Version.Equal[spikes1]}) /call Skinspikes_I
+	/if (${Version.Equal[spikes2]}) /call Skinspikes_II
+	/if (${Version.Equal[spikes3]}) /call Skinspikes_III
+	/if (${Version.Equal[spikes4]}) /call Skinspikes_IV
+	/if (${Version.Equal[spikes5]}) /call Skinspikes_V
+	/if (${Version.Equal[spikes6]}) /call Skinspikes_VI
+	/if (${Version.Equal[gate]})    /call Gate
+	/if (${Version.Equal[IVU]})	/call IVU
+	/if (${Version.Equal[sow1]})	/call SoW_1
+	/if (${Version.Equal[sow2]})	/call SoW_2
+	/if (${Version.Equal[sow3]})	/call SoW_3
+	/if (${Version.Equal[sow4]})	/call SoW_4
+	/if (${Version.Equal[sow5]})	/call SoW_5
+	/if (${Version.Equal[levi]})	/call Levi
+	/if (${Version.Equal[shrink]})	/call Shrink
+	/if (${Version.Equal[hotxvi]})  /call hotxvi
+	/if (${Version.Equal[hotxv]})   /call hotxv
+	/call ccheck
+	/call combine
+
+	/echo Restart me if you want to make another batch.
+	/endmacro
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Info
+|--------------------------------------------------------------------------------
+	Sub Info
+
+	/echo USAGE: /mac potions (what to make) (how much)
+	/echo Here is a list of your options -
+	/delay 5
+	/echo Distillate of Skinspikes I        	-     spikes1
+	/delay 5
+	/echo Distillate of Skinspikes II       	-     spikes2
+	/delay 5
+	/echo Distillate of Skinspikes III      	-     spikes3
+	/delay 5
+	/echo Distillate of Skinspikes IV       	-     spikes4
+	/delay 5
+	/echo Distillate of Skinspikes VI       	-     spikes6
+	/delay 5
+	/echo Philter of Major translocation    	-     gate
+	/delay 5
+	/echo Philter of Unlife Awareness       	-     IVU
+	/delay 5
+	/echo Philter of the Wolf I	        	-     sow1
+	/delay 5
+	/echo Philter of the Wolf II	        	-     sow2
+	/delay 5
+	/echo Philter of the Wolf III	        	-     sow3
+	/delay 5
+	/echo Philter of the Wolf IV            	-     sow4
+	/delay 5
+	/echo Philter of the Wolf V             	-     sow5
+	/delay 5
+	/echo Philter of Gulon's Impunity		-     levi
+	/delay 5
+	/echo Philter of the Ant			-     shrink
+	/delay 5
+	/echo Distillate of Celestial Healing XVI	-     hotxvi
+	/delay 5
+	/echo Distillate of Celestial Healing XV	-     hotxv
+	/delay 5
+	/echo Try typing in one of those in the proper format and you'll be on your way!
+	/end
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: hotxv
+|--------------------------------------------------------------------------------
+	Sub hotxv
+
+	/if (!${FindItem[=Dream Dust].StackCount}>0) {
+		/echo You don't have any Dream Dust, get some and try again.
+		/endm
+	}
+	/if (!${FindItem[=Dream Dust].StackCount}==${Amount}) {
+		/echo You have less Dream Dust than you set to make.
+		/echo Changing the total and making what you have.
+		/varset Amount ${FindItem[=Dream Dust].StackCount}
+	}
+	/target npc Ralkor
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Gerti Blossom" ${Amount}
+	/delay 5
+	/call buy "Small Vial" ${Math.Calc[${Amount}*5]}
+	/delay 5
+	/nomodykey /notify MerchantWnd MW_Done_Button LeftMouseUp
+	/delay 5
+
+	/target npc henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Infused Red Hellebore" ${Amount}
+	/delay 5
+	/nomodykey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+|--------------------------------------------------------------------------------
+|SUB: hotxvi
+|--------------------------------------------------------------------------------
+	Sub hotxvi
+
+	/if (!${FindItem[=Essence of Alaris].StackCount}>0) {
+		/echo You don't have any Essence of Alaris, get some and try again.
+		/endm
+	}
+	/if (!${FindItem[=Essence of Alaris].StackCount}==${Amount}) {
+		/echo You have less Essence of Alaris than you set to make.
+		/echo Changing the total and making what you have.
+		/varset Amount ${FindItem[=Essence of Alaris].StackCount}
+	}
+	/if (!${FindItem[=Infused Rosin].StackCount}=>${Amount}) {
+		/echo You don't have enough Infused Rosin
+		/echo You need to run to Argath and pick
+		/echo some up from Alchemist Caiser.
+		/endm
+	}
+	/target npc Ralkor
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Gerti Blossom" ${Amount}
+	/delay 5
+	/call buy "Small Vial" ${Math.Calc[${Amount}*5]}
+	/delay 5
+	/nomodykey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Shrink
+|--------------------------------------------------------------------------------
+	Sub Shrink
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Betherium Bark" ${Amount}
+	/delay 5
+	/call buy "Simple Potion Vial" ${Amount}
+	/delay 5
+	/call buy "Sprig of Damiana" ${Math.Calc[${Amount}*2]}
+	/delay 5
+	/call buy "Sprig of Feverfew" ${Math.Calc[${Amount}*2]}
+	/delay 5
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Levi
+|--------------------------------------------------------------------------------
+	Sub Levi
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Blue Vervain Bulb" ${Amount}
+	/delay 3s
+	/call buy "Makeshift Potion Vial" ${Amount}
+	/delay 3s
+	/call buy "Pinch of Ground Figwort" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/target npc Andreas
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Sprig of Birthwort" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: SoW_1
+|--------------------------------------------------------------------------------
+	Sub SoW_1
+
+	/target npc Ludvik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Birthwort Leaf" ${Amount}
+	/delay 3s
+	/call buy "Drop of Wolf Blood" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/call buy "Fenugreek Leaf" ${Amount}
+	/delay 3s
+	/call buy "Rough Potion Vial" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/call buy "Violet Tri-Tube Sap" ${Amount}
+	/delay 3s
+	/nomodykey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: SoW_2
+|--------------------------------------------------------------------------------
+	Sub SoW_2
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Blue Vervain Bulb" ${Amount}
+	/delay 3s
+	/call buy "Dash of Wolf Blood" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/call buy "Makeshift Potion vial" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/target npc Andreas
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Sprig of Fenugreek" ${Amount}
+	/delay 3s
+	/call buy "Sprig of Birthwort" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: SoW_3
+|--------------------------------------------------------------------------------
+	Sub SoW_3
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Betherium Bark" ${Amount}
+	/delay 3s
+	/call buy "Dash of Wolf Blood" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/call buy "Simple Potion Vial" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/target npc Andreas
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Sprig of Fenugreek" ${Amount}
+	/delay 3s
+	/call buy "Sprig of Birthwort" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: SoW_4
+|--------------------------------------------------------------------------------
+	Sub SoW_4
+
+	/target npc Edvard
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Birthwort" ${Amount}
+	/delay 3s
+	/call buy "Fenugreek" ${Amount}
+	/delay 3s
+	/call buy "Measure of Wolf Blood" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/delay 3s
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Plain Potion Vial" ${Amount}
+	/delay 3s
+	/call buy "Bugbane" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: SoW_5
+|--------------------------------------------------------------------------------
+	Sub SoW_5
+
+	/target npc Edvard
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Birthwort" ${Amount}
+	/delay 3s
+	/call buy "Fenugreek" ${Amount}
+	/delay 3s
+	/call buy "Measure of Wolf Blood" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/delay 3s
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Smooth Potion Vial" ${Amount}
+	/delay 3s
+	/call buy "Dragonwart" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: IVU
+|--------------------------------------------------------------------------------
+	Sub IVU
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Bugbane" ${Amount}
+	/delay 3s
+	/call buy "Plain Potion Vial" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/delay 3s
+	/target npc Edvard
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Burdock Root" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/call buy "Horehound" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Skinspikes_I
+|--------------------------------------------------------------------------------
+	Sub Skinspikes_I
+
+	/target npc Ludvik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Acaana Leaf" ${Amount}
+	/delay 3s
+	/call buy "Comfrey Leaf" ${Amount}
+	/delay 3s
+	/call buy "Flamewort Leaf" ${Math.Calc[${Amount}*2]}
+	/delay 5s
+	/call buy "Primitive Potion Vial" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 2s
+	/call buy "Sticklewort" ${Amount}
+	/delay 2s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Skinspikes_II
+|--------------------------------------------------------------------------------
+	Sub Skinspikes_II
+
+	/target npc Ludvik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 5s
+	/call buy "Acaana Leaf" ${Amount}
+	/delay 3s
+	/call buy "Comfrey Leaf" ${Amount}
+	/delay 3s
+	/call buy "Flamewort Leaf" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/call buy "Crude Potion Vial" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/delay 1s
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 5s
+	/call buy "Vox's Dust" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Skinspikes_III
+|--------------------------------------------------------------------------------
+	Sub Skinspikes_III
+
+	/target npc Ludvik
+	/moveto ID
+	/delay 10
+	/face nolook
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Acaana Leaf" ${Amount}
+	/delay 3s
+	/call buy "Comfrey Leaf" ${Amount}
+	/delay 3s
+	/call buy "Flamewort Leaf" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/call buy "Rough Potion Vial" ${Amount}
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/delay 2s
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 4s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Violet Tri-Tube Sap" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Skinspikes_IV
+|--------------------------------------------------------------------------------
+	Sub Skinspikes_IV
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 3s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Blue Vervain Bulb" ${Amount}
+	/delay 2s
+	/call buy "Makeshift Potion Vial" ${Amount}
+	/delay 2s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/delay 1s
+	/target npc Andreas
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 3s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Sprig of Flamewort" ${Math.Calc[${Amount}*2]}
+	/delay 2s
+	/call buy "Sprig of Comfrey" ${Amount}
+	/delay 2s
+	/call buy "Sprig of Acaana" ${Amount}
+	/delay 2s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Skinspikes_V
+|--------------------------------------------------------------------------------
+	Sub Skinspikes_V
+
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 3s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Betherium Bark" ${Amount}
+	/delay 3s
+	/call buy "Simple Potion Vial" ${Amount}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/delay 1s
+	/target npc Andreas
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 3s
+	/nomodkey /click right target
+	/delay 2s
+	/call buy "Sprig of Flamewort" ${Math.Calc[${Amount}*2]}
+	/delay 2s
+	/call buy "Sprig of Comfrey" ${Amount}
+	/delay 2s
+	/call buy "Sprig of Acaana" ${Amount}
+	/delay 2s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Skinspikes_VI
+|--------------------------------------------------------------------------------
+	Sub Skinspikes_VI
+
+	/target npc Edvard
+	/moveto ID
+	/delay 10
+	/face nolook
+	/delay 3s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Acaana" ${Amount}
+	/delay 3s
+	/call buy "Comfrey" ${Amount}
+	/delay 3s
+	/call buy "Flamewort" ${Math.Calc[${Amount}*2]}
+	/delay 3s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/delay 1s
+	/target npc Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 3s
+	/nomodkey /click right target
+	/delay 2s
+	/call buy "Plain Potion Vial" ${Amount}
+	/delay 3s
+	/call buy "Bugbane" ${Amount}
+	/delay 1s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Gate
+|--------------------------------------------------------------------------------
+	Sub Gate
+
+	/target NPC Johannes
+	/moveto ID
+	/delay 10
+	/face nolook
+	/delay 2s
+	/nomodkey /click right target
+	/delay 2s
+	/call buy "Handful of Prism Grains" ${Math.Calc[${Amount}*3]}
+	/delay 5s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/target NPC Henrik
+	/delay 10
+	/face nolook
+	/moveto ID
+	/delay 2s
+	/nomodkey /click right target
+	/delay 2s
+	/call buy "Blade Leaf" ${Amount}
+	/delay 5
+	/call buy "Simple Potion Vial" ${Amount}
+	/delay 5
+	/call buy "Yebamante" ${Amount}
+	/delay 5s
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+	/target NPC Edvard
+	/moveto ID
+	/delay 2s
+	/nomodkey /click right target
+	/delay 3s
+	/call buy "Heliotrope" ${Math.Calc[${Amount}*2]}
+	/delay 5
+	/nomodkey /notify MerchantWnd MW_Done_Button LeftMouseUp
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Combine
+|--------------------------------------------------------------------------------
+	Sub Combine
+	/declare pouch string outer
+	/if (${FindItem[=Foldable Reinforced Medicine Bag].InvSlot} && ${pouch.Length}==0 && ${FindItem[=Foldable Reinforced Medicine Bag].InvSlot}>=23 && ${FindItem[=Foldable Reinforced Medicine Bag].InvSlot}<=33) {
+		/varset pouch Foldable Reinforced Medicine Bag
+		/echo Found Alchemy Container ${pouch}
+	}
+	/if (${FindItem[=Reinforced Medicine Bag].InvSlot} && ${pouch.Length}==0 && ${FindItem[=Reinforced Medicine Bag].InvSlot}>=23 && ${FindItem[=Reinforced Medicine Bag].InvSlot}<=33) {
+		/varset pouch Reinforced Medicine Bag
+		/echo Found Alchemy Container ${pouch}
+	}
+	/if (${FindItem[=Foldable Medicine Bag].InvSlot} && ${pouch.Length}==0 && ${FindItem[=Foldable Medicine Bag].InvSlot}>=23 && ${FindItem[=Foldable Medicine Bag].InvSlot}<=33) {
+		/varset pouch Foldable Medicine Bag
+		/echo Found Alchemy Container ${pouch}
+	}
+	/if (${FindItem[=Medicine Bag].InvSlot} && ${pouch.Length}==0 && ${FindItem[=Medicine Bag].InvSlot}>=23 && ${FindItem[=Medicine Bag].InvSlot}<=33) {
+		/varset pouch Medicine Bag
+		/echo Found Alchemy Container ${pouch}
+	}
+	/if (${pouch.Length}==0) {
+		/echo You don't have a Alechmy pouch i recognize, please post this one on the boards and VI can add it
+		/echo Or your pouch might not be in a top level inventory slot.  Move it and restart.
+		/endm
+	}
+
+	/if (${Version.Equal[spikes1]}) 	/declare VRS "Skinspikes I"
+	/if (${Version.Equal[spikes2]})	/declare VRS "Skinspikes II"
+	/if (${Version.Equal[spikes3]})	/declare VRS "Skinspikes III"
+	/if (${Version.Equal[spikes4]})	/declare VRS "Skinspikes IV"
+	/if (${Version.Equal[spikes5]}) 	/declare VRS "Skinspikes V"
+	/if (${Version.Equal[spikes6]})	/declare VRS "Skinspikes VI"
+	/if (${Version.Equal[gate]})          /declare VRS "Major Translocation"
+	/if (${Version.Equal[IVU]})	        /declare VRS "Philter of Unlife Awareness"
+	/if (${Version.Equal[sow1]})	        /declare VRS "Philter of the Wolf I"
+	/if (${Version.Equal[sow2]})	        /declare VRS "Philter of the Wolf II"
+	/if (${Version.Equal[sow3]})	        /declare VRS "Philter of the Wolf III"
+	/if (${Version.Equal[sow4]})	        /declare VRS "Philter of the Wolf IV"
+	/if (${Version.Equal[sow5]})	        /declare VRS "Philter of the Wolf V"
+	/if (${Version.Equal[levi]})          /declare VRS "Philter of Gulon's Impunity"
+	/if (${Version.Equal[shrink]})        /declare VRS "Philter of the Ant"
+
+	/if (!${Window[Tradeskill].Open}) /itemnotify ${FindItem[=${pouch}].InvSlot} rightmouseup
+
+	/delay 1s
+	/nomodkey /notify TradeskillWnd COMBW_SearchTextEdit leftmouseup
+	/delay 5
+	/echo Searching for Recipe.
+	/call Type ${VRS}
+	/delay 1m ${Window[TradeskillWnd].Child[COMBW_SearchButton].Enabled}
+	/nomodkey /notify TradeskillWnd COMBW_SearchButton leftmouseup
+	/delay 2s
+	/notify TradeskillWnd RecipeList listselect 1
+
+	/echo Attempting to make recipe.
+
+:Loop
+	/if (${CombAttempts}==${Amount}) {
+		/call ShowStats
+		/return
+	}
+
+	/notify TradeskillWnd CombineButton Leftmouseup
+	/delay 2s
+	/doevents
+	/notify TradeskillWnd AutoInvButton Leftmouseup
+
+:AutoInvLoop
+	/if (${Cursor.ID}) {
+		/notify TradeskillWnd AutoInvButton Leftmouseup
+		/delay 10
+		/goto :AutoInvLoop
+	}
+
+	/delay 1m ${Window[TradeskillWnd].Child[COMBW_CombineButton].Enabled}
+	/goto :loop
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: ShowStats
+|--------------------------------------------------------------------------------
+	Sub ShowStats
+
+	/if (${CombAttempts}==0) {
+		/varcalc PctSuccess 0
+	} else {
+		/varcalc PctSuccess ((${CombMake}/${CombAttempts})*100)
+	}
+	/echo -----------------------------------------------------
+	/echo Attempts:(${CombAttempts}) | Made:(${CombMake}) | Failed:(${CombFail})
+	/echo Ratio:*(${PctSuccess})%* | Skill Ups:*(${Skillups})*
+	/echo -----------------------------------------------------
+	/notify TradeskillWnd CloseButton Leftmouseup
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Event_CombineMake
+|--------------------------------------------------------------------------------
+	Sub Event_CombineMake
+
+	/varcalc CombAttempts ${CombAttempts}+1
+	/varcalc CombMake ${CombMake}+1
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Event_CombineFail
+|--------------------------------------------------------------------------------
+	Sub Event_CombineFail
+
+	/varcalc CombAttempts ${CombAttempts}+1
+	/varcalc CombFail ${CombFail}+1
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Event_SkillUp
+|--------------------------------------------------------------------------------
+	Sub Event_SkillUp
+
+	/varcalc Skillups ${Skillups}+1
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Event_OutOfStuff
+|--------------------------------------------------------------------------------
+	Sub Event_OutOfStuff
+
+	/echo Seems like you ran out of materials!
+	/call ShowStats
+	/endmacro
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: ccheck (This sub makes sure you open tradeskill experiment window)
+|--------------------------------------------------------------------------------
+	sub ccheck
+	/echo Checking to make sure you have not checked the Open Tradeskill list button.
+	/delay 1s
+	/if (!${Window[OptionsWindow].Open}) /keypress alt+o
+	/delay 10s ${Window[OptionsWindow].Open}
+	/delay 5
+	/if (${Window[OptionsWindow].Child[OptionsGeneralPage].Child[OGP_TradeskillCtrlClickCheckBox].Checked}) {
+		/echo Woops , unclicking your tradeskill window so we don't crash :)
+		/nomodkey /notify OptionsGeneralPage OGP_TradeskillCtrlClickCheckBox leftmouseup
+		/delay 1s
+		/echo Should be goot to go!
+		/return
+	}
+	/delay 1s
+	/echo Looks like yours was already set correctly, lets do some alchemy
+	/return
+|--------------------------------------------------------------------------------
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

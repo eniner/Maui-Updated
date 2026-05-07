@@ -1,0 +1,20 @@
+﻿KAHybrid class source selection for Level 75:
+WAR: L75 - Work in Progress - 75 Warrior (TLP) | https://www.redguides.com/community/resources/75-warrior-tlp.1299/
+CLR: L75 - Work in Progress - 75 Cleric (TLP) | https://www.redguides.com/community/resources/75-cleric-tlp.1294/
+PAL: L75 - Work in Progress - 75 Paladin (TLP) | https://www.redguides.com/community/resources/75-paladin-tlp.1296/
+RNG: L75 - 75 Ranger | https://www.redguides.com/community/resources/75-ranger.1984/
+SHD: L75 - Lvl 75 SHD ini w/conditions for KA11 | https://www.redguides.com/community/resources/lvl-75-shd-ini-w-conditions-for-ka11.1135/
+DRU: L75 - Lvl 75 DRU ini w/conditions for KA11 | https://www.redguides.com/community/resources/lvl-75-dru-ini-w-conditions-for-ka11.1131/
+MNK: L75 - Work in Progress - Level 75 Monk Mainly solo/molo oriented | https://www.redguides.com/community/resources/level-75-monk-mainly-solo-molo-oriented.2575/
+BRD: L75 - Work in Progress - 75 Bard (TLP) | https://www.redguides.com/community/resources/75-bard-tlp.1300/
+ROG: L70 - 70 Rogue TLP | https://www.redguides.com/community/resources/70-rogue-tlp.1025/
+SHM: L75 - Work in Progress - 75 Shaman (TLP) | https://www.redguides.com/community/resources/75-shaman-tlp.1301/
+NEC: L75 - Necro 75 ini w/Con | https://www.redguides.com/community/resources/necro-75-ini-w-con.2173/
+WIZ: L75 - Lvl 75 WIZ ini w/o conditions for KA12 | https://www.redguides.com/community/resources/lvl-75-wiz-ini-w-o-conditions-for-ka12.1526/
+MAG: L75 - Work in Progress - 75 Magician (TLP) | https://www.redguides.com/community/resources/75-magician-tlp.1305/
+ENC: L75 - Lvl 75 ENC ini w/conditions for KA11 | https://www.redguides.com/community/resources/lvl-75-enc-ini-w-conditions-for-ka11.1132/
+BST: L75 - Lvl 75 BST ini w/conditions for KA11 | https://www.redguides.com/community/resources/lvl-75-bst-ini-w-conditions-for-ka11.1134/
+BER: L75 - 75 Berserker FTP KA12 no conditions | https://www.redguides.com/community/resources/75-berserker-ftp-ka12-no-conditions.2066/
+
+Generated files: 48
+Total KA resources scanned: 1338

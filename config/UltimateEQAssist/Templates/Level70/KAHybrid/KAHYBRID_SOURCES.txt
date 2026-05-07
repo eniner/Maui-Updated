@@ -1,0 +1,20 @@
+﻿KAHybrid class source selection for Level 70:
+WAR: L70 - Lvl 70 WAR ini w/o conditions for KA11 - FTP | https://www.redguides.com/community/resources/lvl-70-war-ini-w-o-conditions-for-ka11-ftp.1369/
+CLR: L70 - 70 Cleric TLP | https://www.redguides.com/community/resources/70-cleric-tlp.1021/
+PAL: L65 - 65 Paladin - Retribution EQ | https://www.redguides.com/community/resources/65-paladin-retribution-eq.2958/
+RNG: L70 - Ranger Level 70 | https://www.redguides.com/community/resources/ranger-level-70.1711/
+SHD: L70 - Lvl 70 SHD ini w/conditions for KA11 | https://www.redguides.com/community/resources/lvl-70-shd-ini-w-conditions-for-ka11.895/
+DRU: L70 - Lvl 70 DRU ini w/conditions for KA11 | https://www.redguides.com/community/resources/lvl-70-dru-ini-w-conditions-for-ka11.905/
+MNK: L70 - Level 70 monk | https://www.redguides.com/community/resources/level-70-monk.2730/
+BRD: L70 - 70 FTP Bard no conditions KA12 | https://www.redguides.com/community/resources/70-ftp-bard-no-conditions-ka12.2064/
+ROG: L70 - 70 Rogue TLP | https://www.redguides.com/community/resources/70-rogue-tlp.1025/
+SHM: L70 - Lvl 70 SHM ini w/conditions for KA11 | https://www.redguides.com/community/resources/lvl-70-shm-ini-w-conditions-for-ka11.1366/
+NEC: L70 - Lvl 70 NEC ini w/conditions | https://www.redguides.com/community/resources/lvl-70-nec-ini-w-conditions.1570/
+WIZ: L70 - Lvl 70 WIZ ini w/o conditions for KA11 | https://www.redguides.com/community/resources/lvl-70-wiz-ini-w-o-conditions-for-ka11.1368/
+MAG: L70 - 70 Mage TLP | https://www.redguides.com/community/resources/70-mage-tlp.978/
+ENC: L70 - Enchanter 70  .ini Group and AA grind | https://www.redguides.com/community/resources/enchanter-70-ini-group-and-aa-grind.2662/
+BST: L70 - 70 Beastlord TLP | https://www.redguides.com/community/resources/70-beastlord-tlp.1029/
+BER: L70 - 70 Berserker FTP no conditions | https://www.redguides.com/community/resources/70-berserker-ftp-no-conditions.2067/
+
+Generated files: 48
+Total KA resources scanned: 1338

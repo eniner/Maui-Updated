@@ -1,0 +1,2020 @@
+|------------------------------------------------------------------
+| Program     : BAS.mac Barter Auto Seller
+| Authors      : Ctaylor22, kaen01
+| Purpose     : Scan Barters for items in your inventory you want to sell and sale at the highest asking price or your defined Minimum Sale Price or higher.
+|               This is an automated bot. Use at your own risk.
+| Note        : This macro was written exclusively for subscribers of Redguides.com
+|         
+| Version     : 0.0.3 9/18/2014
+|               0.0.4 10/19/2014
+|               0.0.4 8/21/2016 Updated for patch.
+|				0.0.5 9/22/2017 fix by kaen01
+|				0.0.6 9/22/2017 fix by sl968, and added /bsell and /bkeep commands.
+|
+| Usage       : /mac BAS
+|
+| Examples    : /mac bas
+|               /mac bas help
+|               Use the /mac bas help for more information.
+|
+| Description : This Macro will sell all items, to Barters, Any Item that shows up in the Items list in the Barter Search Window. 
+|               The only Exceptions are as listed. 1 - Items that are in packs that are designated to be skipped(SkipPacks). 
+|               2 - If you wish to keep items that are in your designated, to be skipped packs. Those items can not be in any other non-designated packs.
+|               Example: If you set SkipPacks=1,2,3(Skip Packs 1-3). You have a stack of natural silks in Pack2 that you want to save.                
+|               You also have several stacks of natural silks in Pack5. All Stacks of Natural silk will be sold even the ones in Pack2.
+|               The Pack search is setup to skip items, that are exclusively in those packs you designate to be skipped. 
+|               If there is something you want to save I would suggest you Bank those Items Before running this Macro.
+|               3 - If UseDetail is set to 1, then all Items in the BAS_ItemDetail.ini file with a zero price will be skiped.
+|               
+|               The item detail records are created at the time the macro is run, if the UseDetail field is set on(1 or 2). 
+|               By default UseDetail is turned off(0). If any items are added to the detail lines. The macro will end or pause based
+|               on the AFKPause field. If you use the AFKPause field the character will go /AFK causing the macro to pause. This allows 
+|               you to go and edit the ini file and make any changes before continuing. To continue just use the /afk command to take 
+|               the character out of Pause mode.
+|               
+|               There are 3 Ini files associated with this Macro. 
+|               BAS_CharacterName.ini - This ini file is where you will find the general section and is character specific. 
+|               BAS_ItemDetail.ini - This is a shared Ini file that will be used by all characters. 
+|                                    This ini file contains the Items by name and the minimum sale price that you can update. 
+|               BAS_MuleItems.ini  - This is a shared Ini file that will be used to sell to Barter Mules. 
+|                                     
+|
+| Instructions: When setting up the Ini files most fields are self explanatory. Fields that have special formats are listed Below:    
+|                XBarters      : Name,Name,Name These are the barters you want to EXCLUDE as a Buyer. Don't leave blank set to NULL.
+|                SearchWait    : The time between searches. This feild is the SECONDS to wait. Defaults to 0=Off.
+|                                Setting this to off(0) will end the macro when it finished trying to sell all items.
+|                                If you want the Macro to keep trying to sell all items untill all items are sold set this field
+|                                to how long you want to wait before trying to sell again. 
+|                                Example: Use 300 for 5 minutes, 600 for 10 minutes, or 1200 for 20 minutes.
+|                MinBartReqGlbl: The number of total Buyers that must be up before trying to sell.
+|                MinBartReqDetl: This field is the number of Buyers you require to be selling the item before you try and sell. 
+|                                This is in effect when UseDetail is off(0) or sellat is zero. 
+|                                This will check every item being sold and Skip any item that does not have MinBartReqDetl buyers buying the item.
+|                SkipPacks     : Designate the Packs you want to skip when selling Items. Defaults to 1,2.
+|                                Examples: 1,2,3 or 1,3,5 or 9,10. You decide what packs you want to skip.
+|                SkipHow       : Not Used at this time. Will be for future refinement of pack searching.
+|                SellFromBrtWnd: Sell using the Sell Button from the Barter Window. 
+|                UseDetail     : 0 - Ignore the records in the BAS_ItemDetail.ini and sell to highest buyer.
+|                                1 - Use the sell at value in the ItemDetail file, but skip items with zero sell value.
+|                                2 - Use the sell at value in the ItemDetail file, but sell items with zero sell value to highest Buyer. 
+|
+|
+|               Detail Item Fields: BAS_ItemDetail.ini 
+|                                Name of Item=0(Default). This is the Minimum Sell price. If it is zero then it will sell to highest buyer.(Refer to UseDetail)
+|  
+|                                This field is entered in the following Formats:
+|                                0.001 = 1 Copper
+|                                0.010 = 1 Silver
+|                                0.100 = 1 Gold
+|                                1     = 1 Plat or 1., 1.0, 1.00, 1.000 all = 1 Plat 
+|                                9.999 = 9 Plat 9 Gold 9 Silver 9 Copper. I think you get the idea.
+|                   Note: Always enter the Plat place holder even if it is zero. If using Plat Only, then the decimal and all values to the right can be excluded.
+|                   
+|
+| Credits:      EQMule, Maskoi, eqgeek              
+|               
+|               
+|     suggestion of Things To Do:
+|    1.  Bank After Sell?
+|    2.  Keep HowMuch?
+|    3.  
+|    4.   
+|    5.  
+|-------------------------------------------------------------------------
+#warning
+#turbo 40
+|-----------------------------------------------
+| Setup Events
+|-----------------------------------------------
+
+#event YouSold     "You've sold #1# #*# to #*#"
+#event tranfailed1 "Your transaction failed because your barter data is out of date.#*#"
+#event tranfailed2 "Your transaction failed because you don't possess the specified quantity #*#"
+|#event YourHungry ""
+#event YourThirsty "You are low on drink."
+#event YourThirsty "You are out of drink."
+
+|-----------------------------------------------
+| Setup Binds
+|-----------------------------------------------
+
+#bind BSell /bsell
+#bind BKeep /bkeep
+
+|-----------------------------------------------
+| Sub Main
+|-----------------------------------------------
+Sub Main
+   
+   /declare MacroName              string      outer       BAS
+   /declare MacroVer               string      outer       0.0.6
+   /declare IniFileName            string      outer       ${MacroName}_${Me.CleanName}.ini
+   /declare IniItemDetail          string      outer       ${MacroName}_ItemDetail.ini
+   /declare MuleItemsFile          string      outer       ${MacroName}_MuleItems.ini
+   /declare BASVer                 string      outer       ${Ini[${IniFileName},General,BASVer]}
+
+   /declare w                      int       outer      0
+   /declare x                      int       outer      0
+   |/declare y                      int       outer      0
+   |/declare z                      int       outer      0
+   |/declare p1                     int       outer      0
+   |/declare p2                     int       outer      5000
+   /declare item1                  string    outer
+   /declare IniFile                string    outer      ${IniFileName} 
+   /declare Debug                  int       outer      0
+   /declare Who1                   string    outer      
+   /declare HighestP               string    outer      0
+   |/declare Highestgsc             int       outer      0
+   /declare Buyer                  string    outer      
+   /declare BuyerID                int       outer      0
+   /declare SearchWaitT            timer     outer      0
+   /declare Flag1                  int       outer      0
+   /declare Flag2                  int       outer      0
+   /declare Flag11                 int       outer      0
+   /declare Amoney                 string    outer      ${Me.Platinum}.${Me.Gold}${Me.Silver}${Me.Copper}
+   /declare Bmoney                 string    outer      ${Me.Platinum}.${Me.Gold}${Me.Silver}${Me.Copper}
+   /declare Cmoney                 string    outer      ${Me.Platinum}.${Me.Gold}${Me.Silver}${Me.Copper}
+   /declare HomeX                  float     outer      ${Me.X}
+   /declare HomeY                  float     outer      ${Me.Y}
+   /declare HomeZ                  float     outer      ${Me.Z}
+   /declare Pqty1                  int       outer      0
+   |/declare Pamt1                  float     outer      0
+   /declare sZone                  string    outer      
+   /declare Hcount                 int       outer      0
+   /declare Htimer                 timer     outer      0
+   /declare Tcount                 int       outer      0
+   /declare Ttimer                 timer     outer      0
+   /declare sellat                 string    outer      0.000
+   /declare IBCount                int       outer      0
+   /declare BarterInfo[100,2]      string    outer      NULL
+   /declare idx1                   int       outer      0
+   /declare itemLineM              int       outer      0
+   /declare BARFlag97              int       outer      0
+   /declare BARFlag98              int       outer      0
+   /declare BARFlag99              int       outer      0
+   /declare count1                 int       local      0
+   /declare OXBarters              string    outer
+   /declare qty2                   int       local      0
+   /declare try1                   int       outer      0
+   /declare muleList               string    outer      
+   /declare muleIdx                int       outer      0
+   
+   |/echo !${Ini[${IniFileName},General,BASVer].Length} ${BASVer} ${BASVer.Equal[null]}
+
+   /if (!${Ini[${IniItemDetail}].Length}) /call CreateIni "${IniItemDetail}"
+   /if (!${Ini[${MuleItemsFile}].Length}) /call CreateIni "${MuleItemsFile}"
+ 
+ 
+   /if (${BASVer.Equal[null]}) {
+     /ini "${IniFileName}" "General" "BASVer" "${MacroVer}"
+     /varset Flag1 1
+   }
+   |Here for Future Use when needing to convert things from one version to the next.
+   /if (${MacroVer}!=${BASVer}) {
+      /ini "${IniFile}" "General" "BASVer" "${MacroVer}"
+   }
+   |Create or Load INI General Section.
+   /call LoadIni General BASVer         string ${MacroVer}
+   /call LoadIni General XBarters       string NULL,NULL,NULL
+   /call LoadIni General SearchWait     string 0
+   /call LoadIni General MinBartReqGlbl string 0
+   /call LoadIni General MinBartReqDetl string 0
+   /call LoadIni General SkipPacks      string 1,2
+   /call LoadIni General SkipHow        string 1,1
+   /call LoadIni General AFKPause       int    1
+   /call LoadIni General UseHome        int    1
+   /call LoadIni General UseDetail      int    1
+   /call LoadIni General SellFromBrtWnd int    1
+   /call LoadIni General BarterMule     string NULL
+   /call LoadIni General UseMule        int    0
+   /call LoadIni General GMActionH      string "GMAction 0=Off, 1=Pause Macro, 2=Camp character select, 3=Camp Desktop, 4=Quit game."
+   /call LoadIni General GMAction       int    1
+   /call LoadIni General EQBCon         int    1
+   /call LoadIni General IRCon          int    0
+   /call LoadIni General GroupSplit     int    0
+   /call LoadIni General Debugon        int    0
+   
+| Check Parameters and setup as necessary
+   /if (${Defined[Param0]}) {
+      /if (${Param0.Equal[help]}) {
+         /call DisplayHelp
+      } else {
+         /if (${Param0.Equal[sell]}) {
+            /if (${Defined[Param1]}) {
+               /if (${Param1.Equal[brute]}) {
+                  /echo * Setting Macro to Run in Brute Mode.
+                  /varset AFKPause 0
+                  /varset UseDetail 0
+                  /varset SearchWait 0
+                  /varset MinBartReqGlbl 0
+                  /varset MinBartReqDetl 0
+                  /varset SellFromBrtWnd 1
+                  /varset Flag2 1
+               } else {
+                  /if (${Param1.Equal[tomule]}) {
+                     /if (${BarterMule.Equal[null]}) {
+                        /echo * For me to sell to your Mule. You need to first set the BarterMule field to a proper name. Ending.
+                        /echo *
+                        /echo * Please Use "/mac BAS help" for details.
+                        /end
+                     }
+                     /echo * Setting Macro to Run in Sell To Mule Mode.
+                     |/varset AFKPause 0
+                     |/varset UseDetail 0
+                     |/varset SearchWait 0
+                     |/varset MinBartReqGlbl 0
+                     |/varset MinBartReqDetl 0
+                     |/varset SellFromBrtWnd 1
+                     /varset UseMule 1
+                     /varset Flag2 1
+                  } else {
+                     /echo * Invalid Paramater for Sell.
+                     /echo * Please Use "/mac BAS help" for details.
+                  }
+               }
+            } else {
+               /echo * Paramater Sell requires additional paramater(s).
+               /echo * Please Use "/mac BAS help" for details.
+            }
+         } else {
+            /echo * Invalid Parameter. 
+            /echo * Please Use "/mac BAS help" for details.
+         }
+      }
+      /if (!${Flag2} && !${Flag1}) /end
+   }
+   | Create the initial Items based on SLsize.
+   /if (${Flag1}) {
+      /echo Doing Initial Setup.
+      /echo You Will need to setup the ${IniFile} File Before Continuing. Ending Macro.
+      /call BroadCast ${IRCon} ${EQBCon} r "You Will need to setup the ${IniFile} File Before Continuing. Ending Macro."
+      /end
+   }
+   /call CheckPlugins
+   /if (${Debugon}) /varset Debug 1
+   /varset SearchWaitT ${SearchWait}s   
+   /varset sZone ${Zone}
+   | Check to see if not have ROF 
+   |/if (!${Me.HaveExpansion[Rain of Fear]}) {
+   |   /varset SellFromBrtWnd 0
+   |}
+   /echo ************************************************
+   /echo * Bazaar Auto Seller Ver. ${BASVer}
+   /echo *
+   /if (!${Me.HaveExpansion[Rain of Fear]}) {
+      /if (${Zone.ID}!=151 || ${Zone.ID}==151 && ${Me.X}<0.00 || ${Me.Y}<390.00) {
+         /echo * You Need to be in the Barter(Blue) area of the Bazaar. Ending.
+         /echo *
+         /echo ************************************************
+         /end
+      }
+      /varset SellFromBrtWnd 0
+   } else {
+      /if (${SellFromBrtWnd}) {
+         /echo * You Have the Rain of Fear Expansion. Continuing.
+         /echo *
+         /echo ************************************************
+		 /varset UseHome 0
+      } else /if (${Zone.ID}!=151 || (${Zone.ID}==151 && ${Me.X}<0.00 || ${Me.Y}<390.00)) {
+         /echo * You Have the Rain of Fear Expansion and have marked NOT to sell 
+         /echo * from the Barter Window. 
+         /echo *  
+         /echo * You Need to be in the Barter(Blue) area of the Bazaar. 
+         /echo * or change the SellFromBrtWnd flag in the ini file.
+         /echo * Ending...
+         /echo ************************************************      
+         /end
+      }       
+   }
+   /echo * Excluded Barters: ${XBarters}
+   /if (${SearchWait}) /echo * I am set to Pause for ${SearchWait} Seconds Between Each Cycle.
+   /echo * 
+   /echo * My Current Money is: ${Amoney}
+   /call BroadCast ${IRCon} ${EQBCon} y "My Current Money is: ${Amoney}"
+   /echo * 
+   /echo *
+   /echo ************************************************
+   |/end
+   /varset Flag1 0
+   /if (${UseDetail}) /call UpdateItemList "${IniItemDetail}"
+   /if (${Flag1}) {
+      /call UpdateItemList "${MuleItemsFile}"
+      /echo * Added Detail Items. 
+      /echo *
+      /if (${AFKPause}) {
+         /echo * Going Afk to pause macro while you update the ${IniItemDetail} and/or ${MuleItemsFile} ini File
+         /echo * Use /afk when you wish to continue macro.
+         /echo *
+         /echo ************************************************
+         /if (!${Me.AFK}) /squelch /afk
+         /delay 1s
+      } else {
+         /echo * Ending Macro. Please update the ${IniItemDetail} and/or ${MuleItemsFile} Ini File before continuing.
+         /echo *
+         /echo ************************************************
+         /delay 1s    
+      }
+   }
+   /if (${UseMule}) {
+      /if (${BarterMule.Equal[null]}) {
+         /echo * For me to sell to your Mule. You need to first set the BarterMule field to a proper name. Ending.
+         /echo *
+         /echo * Please Use "/mac BAS help" for details.
+         /end
+      } else {
+	     /varset muleList ${BarterMule}
+		 /varset muleIdx 0
+         /varset AFKPause 0
+         |/varset UseDetail 0
+         /varset SearchWait 0
+         /varset MinBartReqGlbl 0
+         /varset MinBartReqDetl 0
+		 /call OpenBarterWnd
+		 /call getNextMule 
+		 |/call FindMule "${BarterMule}"
+		 /if (!${Flag1}) {
+		    /call CloseBarterWnd
+		    /end
+         }			
+		 /varset muleIdx 0
+      }
+   }
+   /varset OXBarters ${XBarters}
+   /call CloseBarterWnd
+   :TopLoop
+   /if (${MinBartReqGlbl}) /call CountBuyers 
+   /doevents
+   /if (${Debug}) /echo Entering Top of Item search Loop.
+   |Start of Search Loop
+   /varset item1 NULL
+   /varset w 1
+   /varset idx1 100
+   /call ResetBarter
+   :TopLoop1
+   /if (${UseMule}) {
+      /call getNextMule
+      |/call FindMule "${BarterMule}"
+      /if (!${Flag1}) {
+         /goto :BottomLoop
+      }
+   }
+   /call SearchInventory
+   :BottomLoop
+   /call CloseBarterWnd
+   /varset Cmoney ${Me.Platinum}.${Me.Gold}${Me.Silver}${Me.Copper}
+   /if (${Cmoney}>${Bmoney}) {
+      /echo I have Made ${Math.Calc[${Float[${Cmoney},Milli]}-${Float[${Bmoney},Milli]}]} Money this Run, and a Total of ${Math.Calc[${Float[${Cmoney},Milli]}-${Float[${Amoney},Milli]}]}
+      /call BroadCast ${IRCon} ${EQBCon} y "I have Made ${Math.Calc[${Float[${Cmoney},Milli]}-${Float[${Bmoney},Milli]}]} Money this Run, and a Total of ${Math.Calc[${Float[${Cmoney},Milli]}-${Float[${Amoney},Milli]}]}}
+      /if (${Group}>1 && ${GroupSplit} && ${Math.Calc[${Float[${Cmoney},Milli].Int}-${Float[${Bmoney},Milli].Int}]}>1) {
+         /squelch /split ${Math.Calc[${Float[${Cmoney},Milli].Int}-${Float[${Bmoney},Milli].Int}]}
+         /if (${EQBCon}) /call BroadCast ${IRCon} ${EQBCon} y "Splitting Plat of Amount: ${Math.Calc[${Float[${Cmoney},Milli].Int}-${Float[${Bmoney},Milli].Int}]} "
+      }
+      /varset Bmoney ${Cmoney}
+   }
+   /if (!${Flag11}) {
+      /echo There is nothing left in your Inventory to sell. Ending.
+      /end
+   }
+   /varset SearchWaitT ${SearchWait}s
+   /echo Waiting for ${SearchWait} Seconds
+   /if (${UseHome}) /call TrackHome
+   /if (!${SearchWait} || !${Flag11}) /end
+   :WaitHere
+   /delay 5s !${SearchWaitT}
+   /doevents
+   /call GMcheck
+   /if (${SearchWaitT}) /goto :WaitHere
+   /varset w 0
+   /goto :TopLoop
+/return
+
+|-----------------------------------------
+| Sub SellItemHere
+|-----------------------------------------
+Sub SellItemHere(string ItemToSell, string TAmt, int TQty)
+   /if (${Debug}) /echo DEBUG SellItemHere: Enter ${ItemToSell} ${TAmt} ${TQty} ${itemLineM} ${Who1}
+
+   /declare inCount     int     local ${FindItemCount[=${item1}]}
+   |/declare itemLine    int     local ${Window[BarterSearchWnd].Child[BuyLineList].List[=${Who1},5]}
+   /declare BLineCnt    int     local ${Window[BarterSearchWnd].Child[BuyLineList].Items}
+   |/declare x          int     local 0
+   /declare name1       string  local
+   /declare amt3        string  local 
+   /declare amt4        string  local 
+   /declare ListAmt     string  local 0
+   |/declare y           int     local ${itemLine}+1
+   /declare ListItem    int     local ${itemLineM}
+   /declare LBought     int     local 0
+   /declare Lgsc        int     local 0
+   /declare z1          int     local 0
+   /declare z2          int     local 0
+   /declare Litem1      string  local 
+   /declare timer1      timer   local 0
+   /declare Lininv1     int     local 0
+   /declare Lininv2     int     local 0
+   /declare MajorErr    int     local 0
+   /declare ItemCount   int     local 0
+
+
+   :BITop
+   /varset Pqty1 0
+   /varset Flag1 0
+   /varset Flag2 0
+   /varset Lininv1 ${FindItemCount[=${ItemToSell}]}
+   /varset ListItem ${itemLineM}
+   /if (${Debug}) /echo DEBUG SellItemHere: ${ItemToSell} ${TAmt} ${TQty} ${itemLineM} ${Who1} 1.0
+   /if (!${ListItem} || !${Window[BarterSearchWnd].Child[BuyLineList].List[${ListItem},5].Equal[${Who1}]}) {
+      /varset Flag1 = 2
+      /return
+   }
+
+   /varset amt3 ${Window[BarterSearchWnd].Child[BuyLineList].List[${ListItem},3]}
+   /varset amt4 ${Window[BarterSearchWnd].Child[BuyLineList].List[${ListItem},4]}
+   /call BuildAmt "${amt4}"
+   /varset ListAmt ${Macro.Return}
+   
+   /nomodkey /notify BarterSearchWnd BuyLineList listselect ${ListItem}
+   /if ((${Float[${ListAmt},Milli]}>=${Float[${TAmt},Milli]} && !${UseMule}) || ${UseMule}) {
+      /if (${Debug}) /echo Selling ${ItemToSell} at line ${ListItem} for ${ListAmt} ${TAmt} | ${ListAmt}<=${TAmt} UseMule: ${UseMule}
+      |/call SettoItembyLN ${w} "${ItemToSell}"
+      /if (${TQty}==1) {
+         /if (${Debug}) /echo SellItemHere 0.1
+         /doevents flush
+         /delay 5
+         /call SellSingle "${item1}" "${Who1}" ${ListItem} ${w}
+      } else {
+         /varset Pqty1 ${Window[BarterSearchWnd].Child[BuyLineList].List[${ListItem},3]}
+         /if (${Pqty1}<=${TQty}) {
+            /if (${Debug}) /echo SellItemHere ${Pqty1} ${TQty} 1
+            /call CalcPosi "${ItemToSell}" ${Pqty1}
+         } else {
+            /if (${Debug}) /echo SellItemHere ${Pqty1} ${TQty} 2
+            /call CalcPosi "${ItemToSell}" ${TQty}
+         }
+         /if (${Pqty1}) {
+            /if (${Pqty1}>=${FindItem[=${ItemToSell}].StackSize} || ${Pqty1}>=20) {
+               /call SellStack "${ItemToSell}" "${Who1}" ${ListItem} ${w}
+               /if (${Debug}) /echo SellItemHere by the Stack ${Pqty1} ${TQty} ${BARFlag99} 3.1
+            } else {
+               /if (${Pqty1}==1) { 
+                  /call SellSingle "${ItemToSell}" "${Who1}" ${ListItem} ${w}
+                  /if (${Debug}) /echo SellItemHere 1 at a Time ${Pqty1} ${TQty} ${BARFlag99} 4.1
+               } else {                
+                  /if (${Debug}) /echo SellItemHere Enter the Qty Manually ${Pqty1} ${TQty} ${BARFlag99} 5
+                  /call SellQuantity "${ItemToSell}" "${Who1}" ${ListItem} ${w} ${Pqty1}
+               }
+            }
+         }
+      } 
+      |-------------------------------------------------------------------------------
+      |    Flag2 Definition
+      |      0 == ListItem is zero or ListItem is > items in list.
+      |      1 == Your transaction failed because your barter data is out of date.
+      |      2 == Your transaction failed because you don't possess the specified quantity
+      |      3 == Item sold.
+      |-------------------------------------------------------------------------------
+      /if (!${Flag2}) {
+         | Something is Wrong. /doevents missed what happened. testing another way.
+         /if (${Debug}) /echo SellItemHere 10.2
+         /varset Lininv2 ${FindItemCount[=${ItemToSell}]}
+         /if (${Lininv2}==${Lininv1}) {
+            |---------------------------------------------------------------------------
+            |I Was not able to sell for some reason. will close BarterSearchWnd and try again.
+            | will need some different logic for closing and opening the window.
+            |---------------------------------------------------------------------------
+            /if (${Debug}) /echo SellItemHere 10.3 Inventory count still the same.
+            |/varcalc MajorErr ${MajorErr}+1
+            |/goto :BITop
+            /varset Flag1 2
+            /return
+         }
+      } else /if (${Flag2}==3) {
+                /if (${Debug}) /echo SellItemHere 10.4 Sold Some.
+                /varcalc Pqty1 ${Lininv1}-${FindItemCount[=${ItemToSell}]}
+                /goto :Foundit
+             } else /if (${Flag2}==1) {
+            |---------------------------------------------------------------------------
+            | I Was not able to sell for some reason. will close BarterSearchWnd and try again.
+            | will need some different logic for closing and opening the window.
+            |---------------------------------------------------------------------------
+                       /if (${Debug}) /echo SellItemHere 10.5 Buyer Data Needs to be refreshed.
+                       /Windowstate BarterSearchWnd close
+                       /varset Flag1 2
+                       /return
+                    } else {
+                       |Error selling single item. I will have to return and try again.
+                       /if (${Debug}) /echo SellItemHere 10.6 I just couldn't get it to work. Returning.
+                       /varset Flag1 2
+                       /return
+                    }
+   } else {
+     /return
+   }
+:Foundit
+   /varset Flag1 1
+/return
+
+|-----------------------------------------
+| Sub SellStack Sell Items by the Stack
+|-----------------------------------------
+Sub SellStack(string aItem, string aWho, int aLineItem, int aW) 
+   /if (${Debug}) /echo SellStack Enter. ${aItem} ${aWho} ${aLineItem} ${aW}
+   /declare timer1       timer       local 0
+   /if (!${Window[BarterSearchWnd].Open}) {
+      /call OpenBarterWnd
+      /call SettoItembyLN ${aW} "${aItem}"
+      |--------------------------------------------------------------------
+      |   BARFlag99 Definition:
+      |      0 == aW is Zero or aW > Items in List
+      |      3 == Item in list at line aW is no longer the same Item aItem 
+	  |      4 == Mule is no longer in the list of Buyers
+      |     10 == Everything is good lets move on to next step.
+      |--------------------------------------------------------------------
+      /if (${BARFlag99}<10) /return
+   }
+   /if (!${aLineItem} || ${Window[BarterSearchWnd].Child[BuyLineList].Items}<${aLineItem}) /return
+   /nomodkey /notify BarterSearchWnd BuyLineList listselect ${aLineItem}
+   :wait2
+   /delay 2s ${Window[BarterSearchWnd].Child[SellButton].Enabled}      
+   /if (!${Window[BarterSearchWnd].Child[SellButton].Enabled}) /goto :wait2
+
+   /varset Flag2 0
+   /shiftkey /notify BarterSearchWnd SellButton leftmouseup
+   /varset timer1 4s
+   /while (!${Flag2} && ${timer1}) {
+      /doevents
+      /delay 1s
+   }                     
+   /if (${Flag2}<3) {
+      /if (${Debug}) /echo Failed Selling by the Stack ${Flag2} 99
+      /varset Flag1 2 
+      /return
+   }
+   /if (${Debug}) /echo SellStack Exiting.
+/return
+|-----------------------------------------
+| Sub SellSingle Sell Items 1 at a time.
+|-----------------------------------------
+Sub SellSingle(string aItem, string aWho, int aLineItem, int aW)
+   /if (${Debug}) /echo SellSingle Enter.
+   /declare timer1       timer       local 0
+   /if (!${Window[BarterSearchWnd].Open}) {
+      /call OpenBarterWnd
+      /call SettoItembyLN ${aW} "${aItem}"
+      /if (${BARFlag99}<10) /return
+   }
+   /if (!${aLineItem} || ${Window[BarterSearchWnd].Child[BuyLineList].Items}<${aLineItem}) /return
+   /nomodkey /notify BarterSearchWnd BuyLineList listselect ${aLineItem}
+   :wait2
+   /delay 2s ${Window[BarterSearchWnd].Child[SellButton].Enabled}      
+   /if (!${Window[BarterSearchWnd].Child[SellButton].Enabled}) /goto :wait2
+
+   /varset Flag2 0
+   /ctrlkey /notify BarterSearchWnd SellButton leftmouseup
+   /varset timer1 4s
+   /while (!${Flag2} && ${timer1}) {
+      /doevents
+      /delay 1s
+   }                     
+   /if (${Flag2}<3) {
+      /if (${Debug}) /echo Failed Selling 1 at a time ${Flag2} 99
+      /varset Flag1 2 
+      /return
+   }
+   /if (${Debug}) /echo SellSingle Exiting.
+/return
+|-----------------------------------------
+| Sub SellQuantity
+|-----------------------------------------
+Sub SellQuantity(string aItem, string aWho, int aLineItem, int aW, int aQty)
+   /if (${Debug}) /echo SellQuantity Enter.
+   /declare timer1       timer       local 0
+   /if (!${Window[BarterSearchWnd].Open}) {
+      /call OpenBarterWnd
+      /call SettoItembyLN ${aW} "${aItem}"
+      /if (${BARFlag99}<10) /return
+   }
+   /if (!${aLineItem} || ${Window[BarterSearchWnd].Child[BuyLineList].Items}<${aLineItem}) /return
+   /nomodkey /notify BarterSearchWnd BuyLineList listselect ${aLineItem}
+   :wait2
+   /delay 2s ${Window[BarterSearchWnd].Child[SellButton].Enabled}      
+   /if (!${Window[BarterSearchWnd].Child[SellButton].Enabled}) /goto :wait2
+   /varset Flag2 0
+   |/notify BarterSearchWnd SellButton leftmouseup
+   /call EnterQuantity "${aQty}"
+   /if (${Flag2}<3) {
+      /if (${Debug}) /echo Failed Selling Using Quantity Window ${Flag2} 99
+      /return
+   }
+   /if (${Debug}) /echo SellQuantity Exiting.
+/return
+|-----------------------------------------
+| Sub EnterQuantity
+|-----------------------------------------
+Sub EnterQuantity(int aQty)
+   /if (${Debug}) /echo EnterQuantity Enter.
+   /declare Litem1       string       local 
+   /declare z1           int          local 0
+   /declare timer1       timer        local 0
+   /nomodkey /notify BarterSearchWnd SellButton leftmouseup
+   :wait3
+   /delay 1s ${Window[QuantityWnd].Open} 
+   /if (!${Window[QuantityWnd].Open}) /goto :wait3
+   /nomodkey /notify QuantityWnd QTYW_SliderInput leftmouseup
+   /delay 5
+   /if (${aQty}<=20) {
+      /varset Litem1 ${aQty}
+   } else {
+      /varset Litem1 20
+   }
+   /for z1 1 to 3
+       /nomodkey /keypress Backspace chat
+       /delay 5
+   /next z1
+   /for z1 1 to ${Litem1.Length}
+       /if (${Litem1.Mid[${z1},1].Equal[ ]}) {
+          /echo What is a Space doing in a value?
+       } else {
+          /keypress ${Litem1.Mid[${z1},1]} chat
+       }
+   /next z1
+   /delay 5
+   /varset Flag2 0
+   /nomodkey /notify QuantityWnd QTYW_Accept_Button leftmouseup
+   /varset timer1 4s
+   /while (!${Flag2} && ${timer1}) {
+      /doevents
+      /delay 1s
+   }
+   /if (${Flag2}<3) {
+      /if (${Debug}) /echo EnterQuantity Failed Selling using Quantity Window ${aQty} 99
+      /varset Flag1 2 
+      /return
+   }
+   /if (${Debug}) /echo EnterQuantity Exiting.
+/return
+|-----------------------------------------
+| Sub SettoItembyLN Select Item by Line Number
+| This gets the Item from the Item List
+|-----------------------------------------
+Sub SettoItembyLN(int aW, string aItem)
+   /if (${Debug}) /echo SettoItembyLN Enter. ${aW}
+   /varset BARFlag99 0
+   /if (!${aW}) /return
+   /if (${aW}>${Window[BarterSearchWnd].Child[InventoryList].Items}) /return
+   /nomodkey /notify BarterSearchWnd InventoryList listselect ${aW}
+   /delay 5
+   /if (!${aItem.Equal[${Window[BarterSearchWnd].Child[InventoryList].List[${aW},2]}]}) {
+      /varset BARFlag99 3
+      /return
+   }
+   /if (${UseMule}) {
+      /call SetMule "${who1}"
+	  /if (!${Flag1}) {
+         /varset BARFlag99 4
+		 /return
+	  }
+   }
+   /delay 10s ${Window[BarterSearchWnd].Child[SearchButton].Enabled}
+   /nomodkey /notify BarterSearchWnd SearchButton leftmouseup
+   /call WaitBuyLines
+   /varset BARFlag99 10
+   /if (${Debug}) /echo SettoItembyLN Exiting. ${aW}
+/return
+|-----------------------------------------
+| Sub WaitBuyLines
+| This refreshed the Buy lines for the Buyers
+|-----------------------------------------
+Sub WaitBuyLines
+   /if (${Debug}) /echo WaitBuyLines: Enter
+   /declare        i       int 0
+   /declare        j       int 0
+   /delay 5
+   :STop1
+   /varset i ${Window[BarterSearchWnd].Child[BuyLineList].Items}
+   /delay 5
+   /varset j ${Window[BarterSearchWnd].Child[BuyLineList].Items}
+   /if (${i}!=${j}) /goto :STop1
+   /if (${Debug}) /echo WaitBuyLines: Exiting ${j}
+/return
+|-----------------------------------------
+| Sub CheckItem (iniFile to look in)
+|-----------------------------------------
+Sub CheckItem(string Fname1)
+   /declare i          int       local     0
+   /declare j          int       local     0
+   /declare amt1       string    local     0.000
+   /declare FileName1  string    local
+   /declare Ival       string    local     0.000
+
+   /if (${Debug}) /echo CheckItem: Enter ${item1} ${Fname1} ${UseMule}
+   /if (${Fname1.Equal[null]}) {
+      /varset FileName1 ${IniItemDetail}
+   } else {
+      /varset FileName1 ${Fname1}
+   }
+   /if (${UseMule}) /varset Ival 0 
+   /varset Flag1 0
+   /for i 1 to 10
+      /if (!${Select[${i},${SkipPacks}]}) {
+         /if (${Me.Inventory[Pack${i}].Container}) {
+            /for j 1 to ${Me.Inventory[Pack${i}].Container}
+               /if (${Me.Inventory[Pack${i}].Item[${j}].Name.Equal[${item1}]}) {
+                  /if (${Debug}) /echo CheckItem: ${item1} ${i} ${j} ${Me.Inventory[Pack${i}].Item[${j}].Name} 1
+                  /varset Flag1 1
+                  /goto :SearchEnd
+               }
+               |/echo Pack${i} is a Container: ${Me.Inventory[Pack${i}].Name} with ${Me.Inventory[Pack${i}].Container} Slots
+               |/echo -- Pack${i} is Holding ${Me.Inventory[Pack${i}].Items} Items
+               |/echo ------ Item ${Me.Inventory[Pack${i}].Item[${j}].Name} in Slot ${j} 
+               |/echo ------ Item Inventory Slot: ${Me.Inventory[Pack${i}].Item[${j}].InvSlot} Item Slot: ${Me.Inventory[Pack${i}].Item[${j}].ItemSlot} 
+               |/if (${Me.Inventory[Pack${i}].Item[${j}].Stackable}) {
+               |   /echo ------------ Stackable Item Holding ${Me.Inventory[Pack${i}].Item[${j}].Stack} in stack with a Max of ${Me.Inventory[Pack${x}].Item[${j}].StackSize}
+               |} else {
+               |   /echo ------------ Non Stackable Item 
+               |}
+            /next j
+         } else {
+            /if (${Debug}) /echo CheckItem: ${item1} ${i} ${Me.Inventory[Pack${i}].Name} 2
+            /if (${Me.Inventory[Pack${i}].Name.Equal[${item1}]}) {
+               /varset Flag1 1
+               /goto :SearchEnd
+            }
+            |/echo Pack${x} is *NOT* a Container: ${Me.Inventory[Pack${x}].Name} 
+         }
+      }
+   /next i
+:SearchEnd
+   /if (${Flag1}) {
+      /if (${UseDetail}) {
+         /varset amt1 ${Ini["${Fname1}","${item1.Left[1]}","${item1}"]}
+         /if (${Debug}) /echo CheckItem: ${item1} ${amt1} ${Ival} 3
+         /if (${amt1.Equal[null]}) {
+            /varset sellat ${Ival}
+            /if (${Debug}) /echo CheckItem: ${item1} ${amt1} ${Ival} 4
+         } else {
+            /if (${amt1.Find[.]}) {
+               /varset amt1 ${amt1}000
+               /varset sellat ${amt1.Left[${Math.Calc[${amt1.Find[.]}+3]}]}
+               /if (${Debug}) /echo CheckItem: ${item1} ${amt1} ${sellat} ${Ival} 5
+            } else {
+               /varset sellat ${amt1}.000
+               /if (${Debug}) /echo CheckItem: ${item1} ${amt1} ${sellat} ${Ival} 6
+            }
+         }
+      } else {
+         /varset sellat ${Ival}
+         /if (${Debug}) /echo CheckItem: ${item1} ${sellat} ${Ival} 7
+      }
+      /if (${UseDetail}==1 && ${sellat}<0.001) /varset Flag1 0 
+   }
+   /if (${Debug}) /echo CheckItem: Exiting ${Fname1} ${amt1} ${sellat} ${UseDetail} Flag1: ${Flag1}  
+/return
+|-----------------------------------------
+| Sub SearchBuyers
+|-----------------------------------------
+Sub SearchBuyers
+   /declare i       int       local     0
+   /declare j       int       local     0
+   /declare Bqty    int       local     0
+   /declare Hqty    int       local     0
+   /declare Camt1   string    local     0.000
+   /declare Hamt1   string    local     0.000
+   /declare Wstr    string    local 
+   /declare name1   string    local
+   /declare nameL   string    local 
+   /declare Lamt1   string    local
+
+   /if (${Debug}) /echo SearchBuyers: Enter 
+   /varset IBCount 0
+   /varset Flag1 0
+   /varset itemLineM 0
+
+   /delay 10s ${Window[BarterSearchWnd].Child[SearchButton].Enabled}
+   /if (${UseMule}) {
+      /call SetMule "${BarterMule}"
+   } else {
+      /nomodkey /notify BarterSearchWnd PlayerCombo listselect 1
+   }
+   /nomodkey /notify BarterSearchWnd SearchButton leftmouseup
+
+   /delay 1s
+   :STop1
+   /varset i ${Window[BarterSearchWnd].Child[BuyLineList].Items}
+   /delay 5
+   /varset j ${Window[BarterSearchWnd].Child[BuyLineList].Items}
+   
+   /if (${i}!=${j} || !${j} && !${Window[BarterSearchWnd].Child[SearchButton].Enabled}) /goto :STop1
+   /if (!${j}) {
+      /if (${UseMule}) {
+	     /echo Mule ${BarterMule} Not Buying Item: ${item1} 
+	  } else {
+         /echo No Buyers found for Item ${item1}.
+	  }
+      /return
+   } 
+   /if (${Debug}) /echo SearchBuyers: ${i} ${j} ${UseMule}
+   /if (${UseMule}) {
+      /varset Lamt1 999999.999
+      /for i 1 to ${j}
+         /if (${item1.Equal[${Window[BarterSearchWnd].Child[BuyLineList].List[${i},2]}]}) {
+            /varset Wstr ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},4]}
+            /varset Bqty ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},3]}
+            /if (${Debug}) /echo SearchBuyers: ${Wstr} ${Bqty} ${item1} UM.1
+            /call BuildAmt "${Wstr}"
+            /varset Camt1 ${Macro.Return}
+            |/if (${Camt1}<=0.001) {
+            /if (${Camt1}<=Lamt1) {
+               /if (${Debug}) /echo SearchBuyers: ${Camt1} ${Hamt1} ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]} ${item1} UM.2
+               /varset Hamt1 ${Camt1}
+               /varset name1 ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]} 
+               /varset Hqty ${Bqty}
+               /varset itemLineM ${i}
+			   /varset sellat ${Camt1}
+			   /varset HighestP ${Camt1}
+			   /varset Lamt1 ${Camt1}
+			}
+	     }
+	  /next i
+      /varset Who1 ${name1}
+	  /if (${itemLineM}) /varset Flag1 1
+      /if (${Debug}) /echo SearchBuyers: Exiting UM ${name1} ${Who1} Hamt1: ${Hamt1} Sellat: ${sellat} Flag1: ${Flag1} 
+	  /return
+   } else {
+   /for i 1 to ${j}
+      /if (${item1.Equal[${Window[BarterSearchWnd].Child[BuyLineList].List[${i},2]}]}) {
+         /if (!${Select[${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]},${XBarters}]}) {
+            /varset Wstr ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},4]}
+            /varset Bqty ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},3]}
+            /if (${Debug}) /echo SearchBuyers: ${Wstr} ${Bqty} ${item1} 1
+            /call BuildAmt "${Wstr}"
+            /varset Camt1 ${Macro.Return}
+		    | This section is used for when in Bazaar and NOT using SellFromBrtWnd.
+  		    | Makes a list of Buyers and their current distance so I run to the next buyer closest to me.
+		    |
+            /if (${Camt1}>${Hamt1}) {
+               /if (${idx1}>0) /call ResetBarter
+               /varset idx1 1
+               /if (${Debug}) /echo SearchBuyers: ${Camt1} ${Hamt1} ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]} ${item1} 2
+               /varset Hamt1 ${Camt1}
+               /varset name1 ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]} 
+               /varset Hqty ${Bqty}
+               /varset BarterInfo[${idx1},1] ${name1}
+               /varset BarterInfo[${idx1},2] ${Spawn[npc ${name1}].Distance} 
+               /varset itemLineM ${i}
+            } else {
+               /if (${Camt1}==${Hamt1}) {
+                  /varcalc idx1 ${idx1}+1
+                  /varset BarterInfo[${idx1},1] ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]}
+                  /varset BarterInfo[${idx1},2] ${Spawn[npc ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]}].Distance}                
+               } 
+            }
+ 		    | This counts the number of Buyers selling the Item. 
+		    | This does not consider selling price, just that the buyer is selling the item
+            /if (!${nameL.Equal[${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]}]}) {
+               /varcalc IBCount ${IBCount}+1
+               /varset nameL ${Window[BarterSearchWnd].Child[BuyLineList].List[${i},5]}
+            }
+         } 
+      }
+   /next i
+   }
+   | If I am NOT selling from the Barter window. Then get me the closest buyer.
+   | I don't have time for all this running around.
+   |
+   /if (${idx1}>1 && !${SellFromBrtWnd}) {
+      /call SetBarter
+      /varset name1 ${Macro.Return}
+   }
+   /varset Who1 ${name1}
+   /varset HighestP ${Hamt1}
+   /if (${Debug}) /echo SearchBuyers: ${name1} Hamt1: ${Hamt1} Sellat: ${sellat} UseDetail: ${UseDetail} IBCount: ${IBCount} ${item1} ${idx1} ${SellFromBrtWnd}3
+   | if we are NOT using the Detail Lines amount, OR sellat price is zero, 
+   | then make sure there are enough Buyers selling so we get a good deal, if not just return
+   /if ((!${UseDetail} || !${sellat}) && ${IBCount}<${MinBartReqDetl}) /return
+   | check to see if the highest buying price is GE our asking price and the highest buying price is not zero 
+   /if (${Float[${Hamt1},Milli]}>=${Float[${sellat},Milli]} && ${Hamt1}>0.00) /varset Flag1 1
+   | check if highest buying price is GT our asking price, and sellat is zero then set selling price equal to the buying price.
+   /if (${Float[${Hamt1},Milli]}>${Float[${sellat},Milli]} && !${sellat}) /varset sellat ${Hamt1}
+   /if (${Debug}) /echo SearchBuyers: Exiting ${name1} ${Who1} Hamt1: ${Hamt1} Sellat: ${sellat} Flag1: ${Flag1}
+/return
+|-----------------------------------------
+| Sub FindMule
+|-----------------------------------------
+Sub FindMule(string MuleName)
+   /declare i       int       local     0
+   /if (${Debug}) /echo FindMule: Enter 
+   /varset Flag1 0
+   /varset i ${Window[BarterSearchWnd].Child[PlayerCombo].List[=${MuleName}]}
+   /if (!${i}) {
+      /echo Mule ${MuleName} Not in Buyer List /Bonk!
+      /return
+   } 
+   /if (${Debug}) /echo FindMule: ${MuleName} ${i} 1 
+   /nomodkey /notify BarterSearchWnd PlayerCombo listselect ${i}
+   /varset Who1 ${MuleName}
+   /varset HighestP 0.001
+   /varset sellat 0.001
+   /varset Flag1 1
+   /if (${Debug}) /echo FindMule: Exiting ${BarterMule} ${MuleName} Sellat: ${sellat} UseDetail: ${UseDetail} ${item1}
+/return
+|-----------------------------------------
+| Sub SetMule
+|-----------------------------------------
+Sub SetMule(string MuleName)
+   /declare i       int       local     0
+   /if (${Debug}) /echo SetMule: Enter 
+   /varset Flag1 0
+   /varset i ${Window[BarterSearchWnd].Child[PlayerCombo].List[=${MuleName}]}
+   /if (!${i}) {
+      /echo Mule ${MuleName} Needs to be checked. They are NOT showing up in the Barterers List!
+      /return
+   } 
+   /if (${Debug}) /echo SetMule: ${MuleName} ${i} 1 
+   /nomodkey /notify BarterSearchWnd PlayerCombo listselect ${i}
+   /varset Who1 ${MuleName}
+   /varset HighestP 0.001
+   /varset sellat 0.001
+   /varset Flag1 1
+   /if (${Debug}) /echo SetMule: Exiting ${BarterMule} ${MuleName} Sellat: ${sellat} UseDetail: ${UseDetail} ${item1}
+/return
+|-----------------------------------------
+| Sub getNextMule
+|-----------------------------------------
+Sub getNextMule
+   /declare i       int       local     
+   /if (${Debug}) /echo getNextMule: Enter ${muleList} ${muleIdx}
+   /varset Flag1 0
+   :Top1
+   /if (${muleList.Find[,]}) {
+      /varcalc muleIdx ${muleIdx}+1
+      /if (${muleList.Arg[${muleIdx},,].Length}) {
+         /varset BarterMule ${muleList.Arg[${muleIdx},,]}
+      } else {
+         /if (${muleIdx}>1) {
+	        /varset BarterMule null
+		    /return
+	     }
+      }
+   }
+   /if (${BarterMule.NotEqual[null]}) /echo Searching for Mule: ${BarterMule}
+   /varset i ${Window[BarterSearchWnd].Child[PlayerCombo].List[=${BarterMule}]}
+   /if (!${i}) {
+      /echo Mule ${BarterMule} Not in Buyer List! 
+      /goto :Top1
+   } 
+   /if (${Debug}) /echo getNextMule: ${BarterMule} ${i} 1
+   /nomodkey /notify BarterSearchWnd PlayerCombo listselect ${i}
+   /varset Who1 ${BarterMule}
+   /varset HighestP 0.001
+   /varset sellat 0.001
+   /varset Flag1 1
+   /if (${Debug}) /echo getNextMule: Exiting ${muleList} ${muleIdx} ${BarterMule} Sellat: ${sellat} UseDetail: ${UseDetail} ${item1}
+/return
+|-----------------------------------------
+| Sub BuildAmt
+|-----------------------------------------
+Sub BuildAmt(string Sstring)
+   /declare i1      int       local     0
+   /declare j1      int       local     0
+   /declare s1      string    local      
+
+   /if (${Debug}) /echo BuildAmt: Enter ${Sstring}
+   /if (${Sstring.Find[p]}) {
+      /if (${Debug}) /echo BuildAmt: Found Plat
+      /varcalc i1 ${Sstring.Find[p]}-1
+      /varset s1 ${Sstring.Left[${i1}]}.
+   } else {
+      /varset s1 0.
+   }
+   /if (${Debug}) /echo BuildAmt:      ${i1} ${s1} 
+   /if (${Sstring.Find[g]}) {
+      /if (${Debug}) /echo BuildAmt: Found gold
+      /varcalc i1 ${Sstring.Find[g]}-1
+      /varset s1 ${s1}${Sstring.Mid[${i1},1]}
+   } else {
+      /varset s1 ${s1}0
+   }
+   /if (${Debug}) /echo BuildAmt:      ${i1} ${s1} 
+   /if (${Sstring.Find[s]}) {
+      /if (${Debug}) /echo BuildAmt: Found Silver
+      /varcalc i1 ${Sstring.Find[s]}-1
+      /varset s1 ${s1}${Sstring.Mid[${i1},1]}
+   } else {
+      /varset s1 ${s1}0
+   }
+   /if (${Debug}) /echo BuildAmt:      ${i1} ${s1} 
+   /if (${Sstring.Find[c]}) {
+      /if (${Debug}) /echo BuildAmt: Found copper
+      /varcalc i1 ${Sstring.Find[c]}-1
+      /varset s1 ${s1}${Sstring.Mid[${i1},1]}
+   } else {
+      /varset s1 ${s1}0
+   }
+   /if (${Debug}) /echo BuildAmt:      ${i1} ${s1} 
+   /if (${Debug}) /echo BuildAmt: Exiting ${s1} 
+/return ${s1}
+|-----------------------------------------
+| Sub LoadIni
+|-----------------------------------------
+    Sub LoadIni(string sectionName, string varName, string varType, string varValue, string FileName)
+       /if (${Debug}) {
+           /delay 2
+           /echo DEBUG Sub Loadini ${sectionName} ${varName} ${varType} ${varValue} ${FileName}
+       }
+       | Assign ini name to default ini if not defined
+       /if (${FileName.Length}==0) {
+         |  /declare FileName string local
+           /varset FileName ${IniFile}
+       }
+       | 
+       /if (!${Defined[${varName}]} && ${Defined[varType]}) /declare ${varName} ${varType} outer
+       /if (!${Ini[${FileName},${sectionName},${varName}].Length}) {
+          /if (${varValue.Length}) {
+             /ini "${FileName}" "${sectionName}" "${varName}" "${varValue}"
+             /varset ${varName} ${varValue}
+             /if (${Debug}) /echo DEBUG Sub Loadini /varset ${varName} ${varValue}
+          }
+       } else {
+          /varset ${varName} ${Ini[${FileName},${sectionName},${varName}]}
+       }
+       /if (${Debug}) /echo DEBUG LoadIni: leave
+    /return
+|------------------------------------------------
+| Sub Track Buyer
+|------------------------------------------------
+   Sub TrackBuyer
+      /if (${Zone.ID}!=151) /return 
+      /if (${Debug}) /echo DEBUG TrackBuyer: Enter
+      /declare gTimer     timer     local     0
+      /declare lX         float     local     0
+      /declare lY         float     local     0
+      /declare stuckTimer timer     local     0
+      /declare stuckCount int       local     0
+      /Varset Flag1 0
+      /target ID ${BuyerID}
+      /delay 5s ${Target.ID}==${BuyerID}
+      /if (${Target.ID}!=${BuyerID}) {
+         /bc Unable to Target Buyer: ${Who1} Returning.
+         /return 
+      }
+      /if (!${Target.Buyer}) /return
+      |Give me 120 seconds to get to the Buyer.
+      /varset gTimer 120s
+      /if (${Me.Sitting}) /squelch /stand
+      /if (${Target.Distance}>10) {
+         /Nav target
+      } else {
+         /goto :NavRelease
+      }
+      |Check every 2 seconds if I have moved. If not I must be stuck.
+      /varset stuckTimer 2s
+      /varset lX ${Me.X}
+      /varset lY ${Me.Y}
+      :DistanceCheck
+      /delay 5s ${Target.Distance}<20
+      /if (${gTimer}==0 || !${Target.Buyer} || !${Target.ID}) /goto :NavRelease
+      /if (${Target.Distance}>10) {
+         /if (${Debug}) /echo Distance to Target ${Target.Distance} Distance Moved: ${Math.Distance[${lY},${lX}]} ${stuckTimer}
+         /if (${Math.Distance[${Me.Y},${Me.X}:${lY},${lX}]}<10 && !${stuckTimer}) {
+            /echo I think I am Stuck
+            | I may be Stuck. Try Something Different.
+            /varcalc stuckCount ${stuckCount}+1
+            /if (${stuckCount}>15) {
+               /echo I am Stuck. Ending Macro.
+               /end
+            }
+         }
+         /if (!${stuckTimer}) /varset stuckTimer 2s
+         /varset lX ${Me.X}
+         /varset lY ${Me.Y}
+         /goto :DistanceCheck
+      }
+      :NavRelease
+      /if (${Navigation.Active}) /nav stop
+      |Is Target No Longer a Trader?
+      /if (${Debug}) /echo Target a Buyer: ${Target.Buyer} ID: ${Target.ID} Distance: ${Target.Distance}
+      |Is Target NOT in Buyer Mode?
+      /if (!${Target.Buyer}) {
+         /varset Flag1 2
+         /return
+      }
+      |Is Target in Zone?
+      /if (!${Target.ID}) {
+         /varset Flag1 3
+         /return
+      }
+      |I couldn't get close enough to the Trader.
+      /if (${Target.Distance}>20) {
+         /varset Flag1 4
+         /return
+      }      
+      /stick 5 
+      /varset Flag1 1
+      /if (${Debug}) /echo DEBUG TrackBuyer: Exiting
+   /return
+|-----------------------------------------------------
+| Sub SellItem
+|-----------------------------------------------------
+   Sub SellItem(string ItemToSell, string TAmt, int TQty)
+      /if (${Zone.ID}!=151) /return
+      /if (${Debug}) /echo DEBUG SellItem: Enter
+      /declare ListItem     int     local 0
+      /declare ListAmt      string  local 0
+      /declare LBought      int     local 0
+      /declare Lgsc         int     local 0
+      /declare z1           int     local 0
+      /declare z2           int     local 0
+      /declare Litem1       string  local 
+      /declare timer1       timer   local 0
+      /declare Lininv1      int     local 0
+      /declare Lininv2      int     local 0
+      /declare MajorErr     int     local 0
+      /declare ItemCount    int     local 0
+       
+      | BarterMerchantWindow 1-Icon, 2-Description, 3-Buy Quantity, 4-Buy Amount
+      :BITop
+      /if (${Debug}) /echo DEBUG SellItem 0
+      /varset Flag1 0
+      /varset Pqty1 0
+      /varset Lininv1 ${FindItemCount[=${ItemToSell}]}
+      |Check to make sure the Buyer hasn't logged and in Buyer mode.
+      |/echo !${Target.Buyer} !${Window[BarterMerchantWnd].Open} 
+      /if (!${Target.Buyer} || !${Window[BarterMerchantWnd].Open} || ${MajorErr}>=3) /return
+      |/varset ${Find}
+      |Find Item in List
+      /varset ItemCount ${Window[BarterMerchantWnd].Child[BuyLineList].Items}
+      :wait1
+      /varset ListItem ${Window[BarterMerchantWnd].Child[BuyLineList].List[=${ItemToSell},2]}
+      /delay 1s
+      /if (!${ListItem}) {
+         /echo couldn't find ${ItemToSell}
+         /Windowstate BarterMerchantWnd close
+         /if (${TQty}>${Lininv1}) /return ${Lininv1}
+         /return 
+      } else {
+         |Get Buyer Amount of Item to Make sure it is still High price.
+         /varset ListAmt ${Window[BarterMerchantWnd].Child[BuyLineList].List[${ListItem},4]}
+         /call BuildAmt "${ListAmt}"
+         /varset ListAmt ${Macro.Return}
+         |----------------------------------------------
+         | add logic to search for additional buy lines for same item at our price
+         | Some Buyers like to add the same item multiple times 
+         | with lower prices on the first line.
+         | Sneaky little bastards.
+         |----------------------------------------------
+         :SneakyBarturds
+         /if (${Float[${ListAmt},Milli]}>=${Float[${TAmt},Milli]}) {
+            /if (${Debug}) /echo Selling ${ItemToSell} at line ${ListItem} for ${ListAmt} ${TAmt} | ${ListAmt}<=${TAmt} 
+            /nomodkey /notify BarterMerchantWnd BuyLineList listselect ${ListItem}
+            :wait2
+            /delay 2s ${Window[BarterMerchantWnd].Child[SellButton].Enabled}      
+            /if (!${Window[BarterMerchantWnd].Child[SellButton].Enabled}) /goto :wait2
+            /if (${TQty}==1) {
+               /if (${Debug}) /echo SellItem 0.1
+               /doevents flush
+               /delay 5
+               /varset Flag2 0
+               /ctrlkey /notify BarterMerchantWnd SellButton leftmouseup
+               /delay 2s ${Window[BarterMerchantWnd].Child[SellButton].Enabled}
+               /varset timer1 4s
+               /while (!${Flag2} && ${timer1}) {
+                  /doevents
+                  /delay 1s
+               }
+               /if (!${Flag2}) {
+                  | Something is Wrong. /doevents missed what happened. testing another way.
+                  /if (${Debug}) /echo SellItem 0.2
+                  /varset Lininv2 ${FindItemCount[=${ItemToSell}]}
+                  /if (${Lininv2}==${Lininv1}) {
+                     |I Was not able to sell for some reason. will close BarterMerchantWnd and try again.
+                     /if (${Debug}) /echo SellItem 0.3 Inventory count still the same.
+                     /Windowstate BarterMerchantWnd close
+                     /delay 5
+                     /call OpenBuyer
+                     /varcalc MajorErr ${MajorErr}+1
+                     /goto :BITop
+                  }
+               } else /if (${Flag2}==3) {
+                         /if (${Debug}) /echo SellItem 0.4 Sold Some.
+                         /varset Pqty1 1
+                      } else /if (${Flag2}==1) {
+                                /if (${Debug}) /echo SellItem 0.5 Buyer Data Needs to be refreshed.
+                                /Windowstate BarterMerchantWnd close
+                                /delay 5
+                                /call OpenBuyer
+                                /goto :BITop                                
+                             } else {
+                                |Error selling single item. I will have to return and try again.
+                                /if (${Debug}) /echo SellItem 0.6 I just couldn't get it to work. Returning.
+                                /return
+                             }
+            } else {
+               /varset Pqty1 ${Window[BarterMerchantWnd].Child[BuyLineList].List[${ListItem},3]}
+               /if (${Pqty1}<=${TQty}) {
+                  /if (${Debug}) /echo SellItem ${Pqty1} ${TQty} 1
+                  /call CalcPosi "${ItemToSell}" ${Pqty1}
+               } else {
+                  /if (${Debug}) /echo SellItem ${Pqty1} ${TQty} 2
+                  /call CalcPosi "${ItemToSell}" ${TQty}
+               }
+               /if (${Pqty1}) {
+                  /if (${Pqty1}>=${FindItem[=${ItemToSell}].StackSize} || ${Pqty1}>=20) {
+                     /varset Flag2 0
+                     /shiftkey /notify BarterMerchantWnd SellButton leftmouseup
+                     /varset timer1 4s
+                     /while (!${Flag2} && ${timer1}) {
+                        /doevents
+                        /delay 1s
+                     }                     
+                     /if (${Debug}) /echo SellItem by the Stack ${Pqty1} ${TQty} 3
+                  } else {
+                     /if (${Pqty1}==1) { 
+                        /varset Flag2 0
+                        /ctrlkey /notify BarterMerchantWnd SellButton leftmouseup
+                        /varset timer1 4s
+                        /while (!${Flag2} && ${timer1}) {
+                           /doevents
+                           /delay 1s
+                        }
+                        /if (${Debug}) /echo SellItem 1 at a Time ${Pqty1} ${TQty} 4
+                     } else {                
+                        /if (${Debug}) /echo SellItem Enter the Qty Manually ${Pqty1} ${TQty} 5
+                        /nomodkey /notify BarterMerchantWnd SellButton leftmouseup
+                        :wait3
+                        /delay 1s ${Window[QuantityWnd].Open} 
+                        /if (!${Window[QuantityWnd].Open}) /goto :wait3
+                        /nomodkey /notify QuantityWnd QTYW_SliderInput leftmouseup
+                        /delay 5
+                        /if (${Pqty1}<=20) {
+                           /varset Litem1 ${Pqty1}
+                        } else {
+                           /varset Litem1 20
+                        }
+                        /for z1 1 to 3
+                           /nomodkey /keypress Backspace chat
+                           /delay 5
+                        /next z1
+                        /for z1 1 to ${Litem1.Length}
+                           /if (${Litem1.Mid[${z1},1].Equal[ ]}) {
+                              /echo What is a Space doing in a value?
+                           } else {
+                              /keypress ${Litem1.Mid[${z1},1]} chat
+                           }
+                        /next z1
+                        /delay 5
+                        /varset Flag2 0
+                        /nomodkey /notify QuantityWnd QTYW_Accept_Button leftmouseup
+                        /varset timer1 4s
+                        /while (!${Flag2} && ${timer1}) {
+                           /doevents
+                           /delay 1s
+                        }
+                     }
+                  }
+               }
+            } 
+         } else {
+            /if (${Debug}) /echo BuyItem ${TAmt} ${TQty} 6.0
+            /varcalc z2 ${ListItem}+1
+            /if (${z2}<${ItemCount}) {
+               /if (${Debug}) /echo BuyItem ${ItemCount} ${TQty} 6.1
+               /for z1 ${z2} to ${ItemCount}
+                  /if (${Window[BarterMerchantWnd].Child[BuyLineList].List[${z1},2].Equal[${ItemToSell}]}) {
+                     /if (${Debug}) /echo BuyItem ${z1} ${ItemToSell} ${Window[BarterMerchantWnd].Child[BuyLineList].List[${z1},2]} ${TQty} 6.2
+                     /varset ListAmt ${Window[BarterMerchantWnd].Child[BuyLineList].List[${z1},4]}
+                     /call BuildAmt "${ListAmt}"
+                     /varset ListAmt ${Macro.Return}
+                     /if (${Debug}) /echo BuyItem ${ListAmt} ${TAmt} ${z1} 6.3
+                     /if (${Float[${ListAmt},Milli]}>=${Float[${TAmt},Milli]}) {
+                        /varset ListItem ${z1}
+                        /goto :SneakyBarturds
+                     }
+                  }
+               /next z1
+            }
+            /echo Price Changed. I guess I am too slow.
+            /goto :Jump1
+      } 
+      /if (${Debug}) /echo DEBUG SellItem: 6.4
+      |/doevents
+      /delay 1s
+      /varset MajorErr 0
+      /varset timer1 3s
+      :Wait200
+      /if (${Lininv1}==${FindItemCount[=${ItemToSell}]} && !${timer1}) {
+         /delay 5
+         /goto :Wait200
+      }
+      /if (${Debug}) /echo DEBUG SellItem: ${Pqty1} ${Lininv1} ${FindItemCount[=${ItemToSell}]} 6.5
+      /if (${Pqty1} && ${Lininv1}!=${FindItemCount[=${ItemToSell}]}) {
+         /if (${Debug}) /echo SellItem ${Pqty1} ${TQty} 7
+         /varset TQty ${FindItemCount[=${ItemToSell}]}
+         /if (${Debug}) /echo SellItem ${Pqty1} ${TQty} 8
+         /if (${TQty}>0) /goto :BITop
+      }
+      :Jump1
+      /Windowstate BarterMerchantWnd close
+      /varset Flag1 10
+      /stick off
+      /if (${Debug}) /echo DEBUG SellItem: Exiting 
+   /return
+|------------------------------------------------
+| Sub CalcPosi
+|------------------------------------------------
+   Sub CalcPosi(string pitem1, int pSsize)
+      /declare T1amt1      int     local     0
+      /declare T1amt2      int     local     0
+      /if (${Debug}) /echo CalcPosi Enter: ${pitem1} ${pSsize}
+      /if (!${pitem1.Length}) {
+         /if (${Debug}) /echo CalcPosi 1
+         /varset Pqty1 0
+         /return
+      }
+      /varset T1amt2 ${FindItemCount[=${pitem1}]}
+      /if (!${FindItem[=${pitem1}].Stackable}) {
+         /if (${Debug}) /echo CalcPosi 2
+         /varset T1amt1 1
+      } else {
+         /if (${T1amt2}>=${FindItem[=${pitem1}].StackSize}) {
+            |We will only Sell a stack at a time.
+            /if (${Debug}) /echo CalcPosi 3
+            /varset T1amt1 ${FindItem[=${pitem1}].StackSize}
+         } else {
+            | Don't have a full stack to sell will have to use sell button.
+            /if (${Debug}) /echo CalcPosi 4
+            /varset T1amt1 ${T1amt2}
+         }
+      }
+      /if (${Debug}) /echo CalcPosi 5 ${T1amt1} ${pSsize}
+      |Check to see what we can sell this round, is less than what the Barter is willing to buy.
+      /if (${T1amt1}<${pSsize}) /varset pSsize ${T1amt1}
+      /varset Pqty1 ${pSsize}
+   /return
+|----------------------------------------------------
+| Sub Check Plugins
+|----------------------------------------------------
+   Sub CheckPlugins
+      /if (${Debug}) /echo DEBUG CheckPlugins: Enter
+      /varset Flag1 0
+      /if (!${Me.HaveExpansion[Rain of Fear]}) {
+      |/echo !${Navigation.MeshLoaded}
+         /if (!${Navigation.MeshLoaded}) {
+            /echo MQ2Navigation Plugin or Zone Mesh Not Loaded. Trying to Load Plugin First.
+            /Plugin MQ2Navigation
+            /Delay 5s
+            /Nav Load
+            /delay 5s ${Navigation.MeshLoaded}
+         }
+         /if (!${Navigation.MeshLoaded}) {
+            /echo Bazaar Mesh Not created or not Loading. Ending Macro.
+            /end
+         }
+      }
+      /if (!${Bool[${Plugin[MQ2EQBC]}]} && ${EQBCon}) {
+         /squelch /plugin MQ2EQBC
+         /echo MQ2EQBC not detected! This macro requires it! Loading ...
+      }
+      /if (!${Bool[${Plugin[MQ2Moveutils]}]}) {
+         /squelch /plugin MQ2Moveutils
+         /echo MQ2Moveutils not detected! This macro requires it! Loading ...
+      }
+      /if (!${Bool[${Plugin[MQ2Exchange]}]}) {
+         /squelch /plugin MQ2Exchange
+         /echo MQ2Exchange not detected! This macro requires it! Loading ...
+      }
+      /varset Flag1 1
+      /if (${Debug}) /echo DEBUG CheckPlugins: Exiting
+   /return
+| ----------------------------------------------------------------------------
+| SUB: BroadCast - Handles echos and messages in mq2irc and mq2eqbc
+| ----------------------------------------------------------------------------
+    Sub BroadCast(doirc, doeqbc, eqbcolor, message)
+        /if (${eqbcolor.Equal[null]}) /varset eqbcolor w
+        /if (${EQBC.Connected} && ${doeqbc}) /bc [+${eqbcolor}+] ${message} [+x+]
+        /if (${Bool[${Plugin[MQ2IRC]}]} && ${doirc}) /i say ${message}
+        |/echo ${message}
+    /return
+|------------------------------------------------
+| Sub OpenBuyer
+|------------------------------------------------
+   Sub OpenBuyer
+      /if (${Zone.ID}!=151) /return 
+      /if (${Debug}) /echo DEBUG OpenBuyer: Enter
+      /declare cCount     int     local 0
+      /declare liCount    int     local 0
+      /varset Flag1 0
+      :TryAgain
+      /click right target
+      |/echo ${Window[BarterMerchantWnd].Open}
+      /delay 10s ${Window[BarterMerchantWnd].Open}
+      /if (!${Window[BarterMerchantWnd].Open}) /goto :TryAgain
+      |Wait for Items to populate
+      /varset liCount ${Window[BarterMerchantWnd].Child[BuyLineList].Items}
+      /delay 5
+      :wait2
+      /delay 5
+      /varset cCount ${Window[BarterMerchantWnd].Child[BuyLineList].Items}
+      /if (${cCount}!=${liCount}) {
+         /varset liCount ${Window[BarterMerchantWnd].Child[BuyLineList].Items}
+         /goto :wait2
+      }   
+      /if (${Debug}) /echo DEBUG OpenBuyer: Exiting 1
+      /if (!${Window[BarterMerchantWnd].Open}) /return
+      /varset Flag1 1
+      /if (${Debug}) /echo DEBUG OpenBuyer: Exiting 2
+   /return
+|-------------------------------------------------
+| Sub OpenBarterWnd
+|-------------------------------------------------
+   Sub OpenBarterWnd
+      /if (${Debug}) /echo DEBUG OpenBarterWnd: Enter
+      /declare count1     int      local 0
+      /if (${Window[BarterSearchWnd].Open}) /goto :wait100
+      :OpenLoop
+      /if (!${Window[BarterSearchWnd].Open}) /squelch /barter
+      /delay 3s ${Window[BarterSearchWnd].Open}
+      /if (!${Window[BarterSearchWnd].Open}) /goto :OpenLoop
+      |Wait on items to populate search window.
+      :wait100
+      /varset count1 ${Window[BarterSearchWnd].Child[InventoryList].Items}
+      /delay 1s
+      /varset x ${Window[BarterSearchWnd].Child[InventoryList].Items}
+      /if (${x}!=${count1}) /goto :Wait100
+      /if (${Debug}) /echo DEBUG OpenBarterWnd: Exiting ${x}
+   /return 
+|-------------------------------------------------
+| Sub OpenBarterWndA
+|-------------------------------------------------
+   Sub OpenBarterWndA
+      /if (${Debug}) /echo DEBUG OpenBarterWndA: Enter
+      /declare count1     int      local 0
+      /if (${Window[BarterSearchWnd].Open}) /goto :wait100
+      :OpenLoop
+      /if (!${Window[BarterSearchWnd].Open}) /squelch /barter
+      /delay 3s ${Window[BarterSearchWnd].Open}
+      /if (!${Window[BarterSearchWnd].Open}) /goto :OpenLoop
+      |Wait on items to populate Buyer Combobox.
+      :wait100
+      /varset count1 ${Window[BarterSearchWnd].Child[PlayerCombo].Items}
+      /delay 1s
+      /varset x ${Window[BarterSearchWnd].Child[PlayerCombo].Items}
+      /if (${x}!=${count1}) /goto :Wait100
+      /varcalc x ${x}-1
+      /if (${Debug}) /echo DEBUG OpenBarterWndA: Exiting
+   /return
+|-------------------------------------------------
+| Sub CloseBarterWnd
+|-------------------------------------------------
+   Sub CloseBarterWnd
+      /if (${Debug}) /echo DEBUG CloseBarterWnd: Enter
+      /if (!${Window[BarterSearchWnd].Open}) /return
+      :CloseLoop
+      /if (${Window[BarterSearchWnd].Open}) /squelch /barter
+      /delay 3s !${Window[BarterSearchWnd].Open}
+      /if (${Window[BarterSearchWnd].Open}) /goto :CloseLoop
+      /if (${Debug}) /echo DEBUG CloseBarterWnd: Exiting
+   /return
+|-------------------------------------------------
+| Sub Event_tranfailed1
+|-------------------------------------------------
+   Sub Event_tranfailed1
+   |#event tranfailed1 "Your transaction failed because your barter data is out of date.#*#"
+      /varset Flag2 1
+   /return
+|-------------------------------------------------
+| Sub Event_tranfailed2
+|-------------------------------------------------
+   Sub Event_tranfailed2
+   |#event tranfailed2 "Your transaction failed because you don't possess the specified quantity #*#"
+      /varset Flag2 2
+   /return
+|-------------------------------------------------
+| Sub Event_YouSold
+|-------------------------------------------------
+   Sub Event_YouSold(Line1, Qty1)
+      /if (${Debug}) /echo DEBUG Event_YouSold: Enter
+      /declare I1     string      local
+      /declare p1     int         local
+      /declare p2     int         local
+
+      /varcalc p1 ${Qty1.Length}+14
+      /varcalc p2 ${Line1.Find[ to ]}-${p1}
+
+      /varset I1 ${Line1.Mid[${p1},${p2}]}
+      |#event YouSold     "You've sold #1# #*# to #*#"
+      /if (${Debug}) /echo Yea! I just Sold ${Qty1} - ${I1}.
+      /call BroadCast ${IRCon} ${EQBCon} y "I Sold ${Qty1} = ${I1}."
+      /varset Flag2 3      
+      /if (${Debug}) /echo DEBUG Event_YouSold: Exiting
+   /return
+|-------------------------------------------------
+| Sub Event_YourHungry
+|-------------------------------------------------
+   Sub Event_YourHungry
+      /if (${Debug}) /echo DEBUG Event_YourHungry: Enter
+      /if (!${Htimer}) /varcalc Hcount 0 
+      /varcalc Hcount ${Hcount}+1
+      /if (${Hcount}<5) {
+         /call BroadCast ${IRCon} ${EQBCon} r "I am low on Food. Do Something. ${Math.Calc[5-${Hcount}]} Warnnings left."
+      } else {
+         /call BroadCast ${IRCon} ${EQBCon} r "I am low on Food. Camping... SY@CSS."
+         /squelch /camp
+         /end
+      }
+      /varset Htimer 20m
+      /if (${Debug}) /echo DEBUG Event_YourHungry: Exiting
+   /return
+|-------------------------------------------------
+| Sub Event_YourThirsty
+|-------------------------------------------------
+   Sub Event_YourThirsty
+      /if (${Debug}) /echo DEBUG Event_YourThirsty: Enter
+      /if (!${Ttimer}) /varcalc Hcount 0 
+      /varcalc Tcount ${Tcount}+1
+      /if (${Tcount}<5) {
+         /call BroadCast ${IRCon} ${EQBCon} r "I am low on Drink. Do Something. ${Math.Calc[5-${Tcount}]} Warnnings left."
+      } else {
+         /call BroadCast ${IRCon} ${EQBCon} r "I am low on Drink. Camping... SY@CSS."
+         /squelch /camp 
+         /end
+      }
+      /varset Ttimer 20m
+      /if (${Debug}) /echo DEBUG Event_YourThirsty: Exiting
+   /return
+|------------------------------------------------
+| Sub Track Home
+|------------------------------------------------
+   Sub TrackHome
+      /if (${Zone.ID}!=151) /return 
+      /if (${Debug}) /echo DEBUG TrackHome: Enter
+      /declare gTimer     timer     local     0
+      /declare lX         float     local     0
+      /declare lY         float     local     0
+      /declare stuckTimer timer     local     0
+      /declare stuckCount int       local     0
+      /target clear
+      /Varset Flag1 0
+      |Give me 120 seconds to get home.
+      /varset gTimer 120s
+      /if (${Math.Distance[${HomeY},${HomeX}]}>20) {
+         /Nav ${HomeX} ${HomeY} ${HomeZ} 
+      } else {
+         /goto :NavRelease1
+      }
+      :DistanceCheck1
+      /delay 5s ${Math.Distance[${HomeY},${HomeX}]}<20
+      /if (${gTimer}==0) /goto :NavRelease1
+      /if (${Math.Distance[${HomeY},${HomeX}]}>10) {
+         |/echo Distance to Target ${Math.Distance[${HomeY},${HomeX}]} Distance Moved: ${Math.Distance[${lY},${lX}]} ${Math.Distance[${Me.Y},${Me.X}:${lY},${lX}]}
+         /if (${Math.Distance[${Me.Y},${Me.X}:${lY},${lX}]}<10 && !${stuckTimer}) {
+            /echo I think I am Stuck
+            | I maybe Stuck. Try Something Different.
+            /varcalc stuckCount ${stuckCount}+1 
+            /if (${stuckCount}>15) {
+               /echo I am Stuck. Ending Macro.
+               /end
+            }
+         }
+         /doevents
+         /if (!${stuckTimer}) /varset stuckTimer 2s
+         /varset lX ${Me.X}
+         /varset lY ${Me.Y}
+         /goto :DistanceCheck1
+      }
+      :NavRelease1
+      /if (${Navigation.Active}) /nav stop
+      |/echo Trying to get home.
+      /if (${Math.Distance[${HomeY},${HomeX}]}>20) {
+         /varset Flag1 4
+         /return
+      }
+      /if (${Me.Standing}) /squelch /sit
+      /varset Flag1 1
+      /if (${Debug}) /echo DEBUG TrackHome: Exiting
+   /return
+|------------------------------------------------
+| Sub Check Stat
+|------------------------------------------------
+   Sub CheckStat
+      /declare bcFlag    int     local   0
+      /if (${Debug}) /echo DEBUG CheckStat: Enter
+      /if (${EverQuest.GameState.Equal[CHARSELECT]}) /endmac
+      |If you died or zoned then camp and end macro.
+      /if (!${sZone.Equal[${Zone}]} || ${Me.Hovering}) {
+         /call BroadCast ${IRCon} ${EQBCon} r "The Least you can do is FEED ME! I am not in the Bazaar. I will SY@CSS."
+         /squelch /camp
+         /end
+      }
+      :TopCS
+	  /call CheckBinds
+      /if (${Me.AFK} && ${AFKPause}) {
+         /if (!${bcFlag}) {
+            /varset bcFlag 1
+            /call BroadCast ${IRCon} ${EQBCon} r "Pausing Due to being AFK."
+         }
+         /delay 5s
+         /doevents
+         /goto :TopCS
+      }
+      /if (${bcFlag}) {
+         /call CloseBarterWnd
+
+      }
+      /if (${Debug}) /echo DEBUG CheckStat: Exiting
+   /return
+|------------------------------------------------
+| Sub GMCheck
+|------------------------------------------------
+   Sub GMCheck
+   |"GMAction 0=Off, 1=Pause Macro, 2=End Macro, 3=Unload MQ2, 4=Camp character select, 5=Camp Desktop, 6=Quit game."
+      /if (${Debug}) /echo DEBUG GMCheck: Enter
+      /declare holding     int     local 0
+      /declare TempID      int     local 0
+      /declare FlagT1      int     local 0
+
+      :GMLockDown
+      /if (${SpawnCount[GM]}>=1) {
+         /if (${GMAction}==1) {
+            /if (!${holding}) {
+                    /echo Macro on hold due to GM Presence
+                    /call BroadCast ${IRCon} ${EQBCon} r "** GM DETECTED **"
+                    /multiline ; /beep ; /timed 1 /beep ; /timed 1 /beep ; /timed 5 /beep ; /timed 5 /beep ; /timed 5 /beep ; /timed 5 /beep ; /timed 1 /beep ; /timed 1 /beep
+                    /varset holding 1
+            }
+            /if (${Navigation.Active}) /nav stop
+            /delay 2s
+            /goto :GMLockDown
+         } else {
+            /varset holding 0
+         }
+         /if (${Navigation.Active}) /nav stop
+         /if (${GMAction}==2) /multiline ; /echo Ending Macro due to GM Presence ; /mq2log Ending Macro due to GM Presence ; /endmacro
+         /if (${AFKGMAction}==3) /multiline ; /echo Unloading MQ2 due to GM Presence; /mq2log Unloading MQ2 due to GM Presence ; /unload
+         /if (${AFKGMAction}==4) /multiline ; /echo Camping to CS due to GM Presence ; /mq2log Camping to CS due to GM Presence ; /camp ; /endmacro
+         /if (${AFKGMAction}==5) /multiline ; /echo Camping to DT due to GM Presence ; /mq2log Camping to DT due to GM Presence ; /camp desktop ; /endmacro
+         /if (${AFKGMAction}==6) /multiline ; /echo Quitting out of EQ due to GM Presence ; /mq2log Quitting out of EQ due to GM Presence ; /quit ; /endmacro
+        }
+      /if (${Debug}) /echo DEBUG GMCheck: Exiting
+   /return
+|------------------------------------------------
+| Sub CountBarts
+|------------------------------------------------
+   Sub CountBuyers
+      |/if (${Zone.ID}!=151) /return 
+      /if (${Debug}) /echo CountBuyers: Enter
+      /declare count1     int     local 0
+      /declare a1         int     local 0
+      /declare timer1     timer   local 0
+      :TryAgain
+      /call OpenBarterWndA
+      /call CloseBarterWnd
+      /varset count1 ${x}
+      /if (${Debug}) /echo CountBuyers: ${count1} ${MinBartReqGlbl} 1
+      /if (${count1}>=${MinBartReqGlbl}) /return
+      :WaitLoop
+      /if (!${SearchWait}) {
+         /echo No Wait Timer set. Ending.
+         /end
+      }
+      /varset timer1 ${SearchWait}s 
+      /echo Not enough Buyers available. Pausing.
+      :WaitNext
+      /delay 10s
+      /if (${SearchWait}) /goto :WaitNext
+      /goto :TryAgain
+   /return
+|------------------------------------------------
+| Sub UpdateItemList
+|------------------------------------------------
+   Sub UpdateItemList(string IniFileName1)
+   /declare FirstLetter    string     local
+   /declare i1             int        local    0
+   /declare j1             int        local    0
+   /if (${Debug}) /echo ${IniFileName1}
+   /for i1 1 to 10
+      /if (!${Select[${i1},${SkipPacks}]}) {
+         /if (${Me.Inventory[Pack${i1}].Container}) {
+            /if (${Me.Inventory[Pack${i1}].Items}) {
+               /for j1 1 to ${Me.Inventory[Pack${i1}].Container}
+                  /if (${Me.Inventory[Pack${i1}].Item[${j1}].ID} && !${Me.Inventory[Pack${i1}].Item[${j1}].NoDrop}) {
+                     /varset FirstLetter ${Me.Inventory[Pack${i1}].Item[${j1}].Name.Left[1]}
+                     /if (${Debug}) {
+                        /echo UpdateItemList: ${Ini["${IniFileName1}","${FirstLetter}","${Me.Inventory[Pack${i1}].Item[${j1}].Name}"].Length} 
+                        /echo --------------- ${IniFileName1} ${FirstLetter} ${Me.Inventory[Pack${i1}].Item[${j1}].Name} ${Ini[${IniFileName1},"${FirstLetter}","${Me.Inventory[Pack${i1}].Item[${j1}].Name}"]}
+                     }
+                     /if (!${Ini["${IniFileName1}","${FirstLetter}","${Me.Inventory[Pack${i1}].Item[${j1}].Name}"].Length}) {
+                        /Ini "${IniFileName1}" "${FirstLetter}" "${Me.Inventory[Pack${i1}].Item[${j1}].Name}" 0
+                        /echo * ${Me.Inventory[Pack${i1}].Item[${j1}].Name} to IniFile: ${IniFileName1}
+                        /varset Flag1 1
+                     }
+                  }
+               /next j1
+            }
+         } else {
+            /if (${Me.Inventory[Pack${i1}].ID} && !${Me.Inventory[Pack${i1}].NoDrop}) {
+               /varset FirstLetter ${Me.Inventory[Pack${i1}].Name.Left[1]}
+               /if (!${Ini["${IniFileName1}","${FirstLetter}","${Me.Inventory[Pack${i1}].Name}"].Length}) {
+                  /Ini "${IniFileName1}" "${FirstLetter}" "${Me.Inventory[Pack${i1}].Name}" 0
+                  /echo * ${Me.Inventory[Pack${i1}].Name} to IniFile: ${IniFileName1}
+                  /varset Flag1 1
+               }
+            }
+         }
+      }
+   /next i1
+   /return
+|------------------------------------------------
+| Sub DisplayHelp
+|------------------------------------------------
+Sub DisplayHelp
+   /echo ****************************************************
+   /echo * Macro Command Paramaters:
+   /echo * The Macro will except the following Paramaters: 
+   /echo *      
+   /echo * Help
+   /echo * Sell
+   /echo *  Sub Paramaters for Sell: Brute, ToMule
+   /echo * 
+   /echo *  Sell Brute:
+   /echo *   Forces the Macro to sell any item at the highest
+   /echo *   price available. This will Ignore Minimum sell
+   /echo *   prices in the itemdetail.ini file and also  
+   /echo *   ignores the MinBartReqGlbl and MinBartReqDetl
+   /echo *   fields. This will NOT ignore SkipPacks.
+   /echo * 
+   /echo *  Sell ToMule:
+   /echo *   When you setup a toon in Barter mode that will buy 
+   /echo *   any item for 1 copper. This mode will sell anything
+   /echo *   in inventory to your buyer at the buyers 0.001
+   /echo *   asking price. You must enter your Barters name
+   /echo *   in the BarterMule field in the INI file. This
+   /echo *   will NOT ignore SkipPacks. 
+   /echo * 
+   /echo * 
+   /echo * 
+   /echo ****************************************************
+/return
+|------------------------------------------------
+| Sub ResetBarter
+|------------------------------------------------
+Sub ResetBarter
+   /declare     a     int    local  0
+   /declare     b     int    local  0
+   /for a 1 to ${idx1}
+      /for b 1 to 2
+         /varset BarterInfo[${a},${b}] NULL
+      /next b
+   /next a
+   /varset idx1 0
+/return
+|------------------------------------------------
+| Sub SetBarter
+|------------------------------------------------
+Sub SetBarter
+   /declare     a     int    local  0
+   /declare     b     int    local  0
+   /declare     d1    float  local  99999.99
+   /declare     name1 string 
+
+   /for a 1 to ${idx1}
+      /if (${BarterInfo[${a},2]}<${d1}) {
+         /varset d1 ${BarterInfo[${a},2]}
+         /varset name1 ${BarterInfo[${a},1]}
+      }
+   /next a
+   /call ResetBarter
+/return ${name1}
+|-----------------------------------------
+| Sub SearchInventory (iniFile to look in)
+|-----------------------------------------
+Sub SearchInventory(string Fname1, string Val1)
+   /declare i          int       local     0
+   /declare j          int       local     0
+   /declare amt1       string    local     0.000
+   /declare Ival       string    local     0.000
+   /declare FileName1  string    local
+
+   /varset Flag11 0
+
+   /if (${Debug}) /echo SearchInventory Enter: ${item1} ${Fname1} ${UseMule}
+   /call OpenBarterWnd
+   /if (!${Window[BarterSearchWnd].Child[InventoryList].Items}) {
+      /varset Flag1 0
+	  /echo No Items Listed in the Barter Window. 
+	  /return
+   }
+   /if (!${UseMule}) {
+      /varset FileName1 ${IniItemDetail}
+	  /varset Ival 0.000
+   } else {
+      /varset FileName1 ${MuleItemsFile}
+	  /varset Ival 0
+   }
+   /for i 1 to 10
+      /varset Flag1 0
+      /if (!${Select[${i},${SkipPacks}]}) {
+         /if (${Me.Inventory[Pack${i}].Container} && ${Me.Inventory[Pack${i}].Items}) {
+		    /if (${Debug}) /echo SearchInventory: ${Me.Inventory[Pack${i}].Container} ${Me.Inventory[Pack${i}].Items} ${i} 1.0
+            /call GMcheck
+            /call CheckStat
+            |/call OpenBarterWnd
+            /for j 1 to ${Me.Inventory[Pack${i}].Container}
+               /if (${Me.Inventory[Pack${i}].Item[${j}].Name.NotEqual[null]}) {
+			      /varset item1 ${Me.Inventory[Pack${i}].Item[${j}].Name}
+                  /if (${Debug}) /echo SearchInventory: ${item1} ${i} ${j} ${Me.Inventory[Pack${i}].Item[${j}].Name} 1.1
+                  /varset Flag1 1
+			      /call VerifyItem "${FileName1}" "${Ival}"
+				  /if (${Flag1}) {
+				     /varset Flag11 1
+                     /nomodkey /notify BarterSearchWnd InventoryList listselect ${w}
+                     /call SearchBuyers
+					 /if (${Flag1}) {
+					    /call SellProc
+						/if (${Debug}) /echo SearchInventory Return From SellProc: ${Flag1}
+				     }
+				  }
+               }
+               /varset item1 NULL
+               /doevents
+               /varset XBarters ${OXBarters}
+               |/varset try1 0			   
+            /next j
+         } else {
+		    /if (!${Me.Inventory[Pack${i}].Container} && ${Me.Inventory[Pack${i}].Name.NotEqual[null]}) {
+			   /varset item1 ${Me.Inventory[Pack${i}].Name}
+               /if (${Debug}) /echo Item: ${item1} ${i} !${Me.Inventory[Pack${i}].Container} ${Me.Inventory[Pack${i}].Name} 2
+               /varset Flag1 1
+               /call VerifyItem "${FileName1}" "${Ival}"
+				  /if (${Flag1}) {
+				     /varset Flag11 1
+                     /nomodkey /notify BarterSearchWnd InventoryList listselect ${w}
+                     /call SearchBuyers
+					 /if (${Flag1}) {
+					    /call SellProc
+						/if (${Debug}) /echo SearchInventory Return From SellProc: ${Flag1}
+                     }
+				  }
+            |/echo Pack${x} is *NOT* a Container: ${Me.Inventory[Pack${x}].Name} 
+            }
+         }
+      }
+   /next i
+   /call CloseBarterWnd
+   /if (${Debug}) /echo SearchItem: Enter ${item1} ${Fname1} ${UseMule}
+/return
+|-----------------------------------------
+| Sub VerifyItem (iniFile to look in)
+|-----------------------------------------
+Sub VerifyItem(string Fname1, string Val1)
+   /declare z1        int       0
+   /declare amt1      string    0.000
+   |
+   |
+   |
+   /if (${Debug}) /echo VerifyItem: Enter ${item1} ${Fname1} ${UseMule} ${UseDetail}
+      | Check the ini file if UseDetail is set
+      /if (${UseDetail}) {
+         /varset amt1 ${Ini["${Fname1}","${item1.Left[1]}","${item1}"]}
+         /if (${Debug}) /echo VerifyItem: ${item1} ${amt1} ${Val1} 3
+         /if (${amt1.Equal[null]}) {
+            /varset sellat ${Val1}
+            /if (${Debug}) /echo VerifyItem: ${item1} ${amt1} ${Val1} 4
+         } else {
+            /if (${amt1.Find[.]}) {
+               /varset amt1 ${amt1}000
+               /varset sellat ${amt1.Left[${Math.Calc[${amt1.Find[.]}+3]}]}
+               /if (${Debug}) /echo VerifyItem: ${item1} ${amt1} ${sellat} ${Val1} 5
+            } else {
+               /varset sellat ${amt1}.000
+               /if (${Debug}) /echo VerifyItem: ${item1} ${amt1} ${sellat} ${Val1} 6
+            }
+         }
+      } else {
+         | This is where you need to set things based on not using detail Item file.	  
+         /varset sellat 0.000
+         /if (${Debug}) /echo VerifyItem: ${item1} ${sellat} ${Val1} 7
+      }
+	  /varset w ${Window[BarterSearchWnd].Child[InventoryList].List[=${item1},2]}
+	  | if we should use the INI file and the sell amount Less than 0.001(either not in file or set to skip)
+	  | or the item we are looking at is not listed in the Inventory List or the Barter window then set to skip.
+      /if (${UseDetail}==1 && ${sellat}<0.001 || !${w}) /varset Flag1 0 
+   /if (${Debug}) /echo VerifyItem: Exiting ${Fname1} ${amt1} ${sellat} ${UseDetail} Flag1: ${Flag1}
+/return
+|-----------------------------------------
+| Sub SellProc
+|-----------------------------------------
+Sub SellProc
+   /declare      qty2       int       0
+   
+    /if (${Debug}) /echo SellProc ${UseMule} ${item1} ${sellat} 2.1
+	:Top1
+    /if (${SellFromBrtWnd}) {
+       /if (${Debug}) /echo SellProc ${UseMule} ${item1} ${HighestP} 2.2
+          | Lets sell From the Barter window. Requires ROF expansion..
+          /varset qty2 ${FindItemCount[=${item1}]}
+          /call SellItemHere "${item1}" "${HighestP}" ${qty2}
+          |----------------------------------------------------------------------------------------
+          | Flag1 Definition:
+          |   1 == Everything went ok. Item was sold.
+          |   2 == Either No LineItem or Buyer Name not match Name on current LineItem. or 
+          |        Flag2 was set to 1 or 2. It failed and needs refresh to try again.
+          |   3 == Reserved for future use.
+          |----------------------------------------------------------------------------------------
+          /if (${Flag1}==2) {
+             /varcalc try1 ${try1}+1
+             /if (${try1}>3) {
+                /if (${Debug}) /echo Error Selling from barter window. I tried 3 times to sell ${item1} 2.3
+                /return 
+             }
+             /goto :Top1 
+          }
+          |
+          |Check if all of the current items were sold or not. 
+          |If I have more Items lets find another buyer. 
+          |
+          /if (${Flag1} && ${FindItemCount[=${item1}]}) {
+             /varset try1 0
+             /if (${Pqty1}) {
+                /if (${Debug}) /echo SellProc Sold Item: ${item1}. I Still have more to sell to vendor ${Who1} 3
+                /goto :Top1
+             }
+             /return
+          }
+    } else {
+       /call CloseBarterWnd
+       /varset BuyerID ${Spawn[PC ${Who1}].ID}
+       /varset Buyer ${Who1}
+       /call TrackBuyer
+       /if (${Flag1}) {
+          /call OpenBuyer
+          /if (${Flag1}) {
+             /varset qty2 ${FindItemCount[=${item1}]}
+             /call SellItem "${item1}" "${HighestP}" ${qty2}
+             /if (${Debug}) /echo SellProc ${item1} ${Flag1} ${FindItemCount[=${item1}]} ${XBarters} ${Who1} 4.
+             /if (${Flag1}!=10 || ${FindItemCount[=${item1}]}>0) {
+                /varset XBarters ${XBarters},${Who1}
+                /return 
+             }
+          }             
+       }
+    }
+/return 
+|------------------------------------------------
+| Sub CreateIni
+|------------------------------------------------
+Sub CreateIni(string IniFileName1)
+    /if (${Ini[${IniFileName1}].Length}) /return
+    /declare a local General|A|B|C|D|E|F|G|H|I|J|K|L|M|N|O|P|Q|R|S|T|U|V|W|X|Y|Z
+    /echo Creating ini file ${IniFileName1}
+    /declare i int local 
+    /for i 1 to 27
+        /ini ${IniFileName1} "${a.Arg[${i},|]}" "|===================================" "==================================|"
+    /next i
+/return
+
+|------------------------------------------------
+| Sub NoItem - Display an error if no item 
+|------------------------------------------------
+
+sub NoItem
+	/echo You must have an item on your cursor in order to use this command!
+	/beep
+/return
+
+|------------------------------------------------
+| Sub BKeep - Mark an item to keep
+|------------------------------------------------
+
+sub Bind_BKeep
+	/if (${Cursor.ID}) {
+		/Ini "${IniItemDetail}" "${Cursor.Name.Left[1]}" "${Cursor.Name}" 0
+		/echo * ${Cursor.Name} now set to Keep in IniFile: ${IniItemDetail}
+		/autoinv
+	} else {
+		/call NoItem
+	}
+/return
+
+|------------------------------------------------
+| Sub BSell - Mark an item to sell
+|------------------------------------------------
+
+sub Bind_BSell (int Value)
+	/if (${Cursor.ID}) {
+	/echo Value: ${Value}
+		/if (${Value}<1) { 
+		/varcalc Value ${Value}+1
+		}
+		/Ini "${IniItemDetail}" "${Cursor.Name.Left[1]}" "${Cursor.Name}" "${Value}"
+		/echo * ${Cursor.Name} set to sell for ${Value} in IniFile: ${IniItemDetail}
+		/autoinv
+	} else {
+		/call noitem
+	} 
+/return
+
+
+sub CheckBinds
+	/delay 5
+/return

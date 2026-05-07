@@ -1,0 +1,359 @@
+| 
+| --- Originally LazyLobbyRez by TreeHuginDruid
+| LazyLobbyRez.mac by TreeHuginDruid
+| Written 11-14-2010.
+| Updated 06-26-2014 for merc switching checks and MQ2Rez bypass.
+| Updated 02-03-2015 for item giving fix.
+| In memory of TreeHuginDruid, may he rest in peace.
+| Updated 02-05-2020 for using mq2nav and run from any zone.
+| Uses Origin or Throne of Heroes, mq2nav and mq2easyfind - You will need navmesh maps loaded for all zones listed below
+| Updated 12-13-2020 Ends if you try to revive a Gold Status mercenary without All Access membership
+| Attempts to get plat from bank if you are broke and need a soulstone
+| Attemps to get plat from bank if you are broke and need to spawn a mercenary
+| Attempt to revive a mercenary every 15 seconds for 5 minutes before ending macro
+
+
+#Event Gold 	"You can't unsuspend the selected mercenary because this mercenary requires you to have an All Access membership#*#"
+#Event Broke	"You can't unsuspend your mercenary because you don't have the required upkeep cost#*#"
+|--------------------------------------------------------------------------------
+|SUB: MAIN
+|--------------------------------------------------------------------------------
+Sub Main
+
+    /declare SoulStoneMerchant     	string outer   "A Priest of Luclin"
+	/declare CorpseSummoner 	string outer   "A Priestess of Luclin"
+	/declare RangeDist              int    outer   8
+	/declare SoulStoneName		string outer
+	/declare bag               	string outer
+	/declare slot              	string outer
+	/declare ItemToGet              string outer
+	/declare MercClass              string outer
+	/declare i			int    outer
+
+	/squelch /target clear
+	/delay 10
+	
+    /call NavCheck
+    /call CheckZone
+	/call GetCorpse
+	/call ReviveMerc
+	/call TakeRez
+
+	/echo \ayDelaying 60 seconds to let merc buff my gimp ass!
+	/delay 60s
+	/echo \agSetting Mercenary to Passive for now!
+	/if (!${Mercenary.State.Equal[PASSIVE]}) {
+	/stance Passive
+	}
+	/echo \atIf you wish to suspend merc and logout, you will need to uncomment the next two lines in your lazylobbyrez file.
+	|/call SuspendMerc
+	|/call LogMeOut
+/end
+
+|--------------------------------------------------------------------------------
+|SUB: NavCheck
+|--------------------------------------------------------------------------------
+Sub NavCheck
+	/echo \agChecking for required plugins...
+
+	/if (!${Plugin[MQ2Nav].Name.Equal[MQ2Nav]}) {
+		/echo \agLoading MQ2Nav
+		/squelch /plugin MQ2Nav load
+		/delay 1s
+		/if (!${Plugin[MQ2Nav].Name.Equal[MQ2Nav]}) {
+			/beep
+			/echo \ayUnable to load MQ2MoveUtils plugin, stopping.
+			/end
+		}
+	} else {
+		/echo \agMQ2Nav plugin is loaded.
+	}
+/return
+|--------------------------------------------------------------------------------
+
+| --------------------------------------------------------------------------------------------
+| SUB: CheckZone
+| --------------------------------------------------------------------------------------------
+Sub CheckZone
+		/if (!${Select[${Zone.ShortName},guildlobby,poknowledge,moors,crescent,neighborhood]}) /call UseThrone
+		/while (!${Zone.Name.Equal[Guild Lobby]}) {
+		/if (${Zone.ShortName.Equal[neighborhood]}) /call sunrise
+		/if (${Zone.Name.Equal[Guild Lobby]}) /return
+		/if (${Zone.ShortName.Equal[moors]}) /call moors
+		/if (${Zone.ShortName.Equal[crescent]}) /call crescent
+		/if (${Zone.ShortName.Equal[poknowledge]}) /call poknowledge
+
+	/delay 2
+	}
+/return
+|--------------------------------------------------------------------------------
+
+| --------------------------------------------------------------------------------------------
+| SUB:sunrise
+| --------------------------------------------------------------------------------------------
+Sub sunrise
+	/nav locyxz -3000 2030 5
+	/delay 30
+	/doortarget
+	/click left door
+	/delay 40
+	/return
+| --------------------------------------------------------------------------------------------
+| SUB: moors
+| --------------------------------------------------------------------------------------------
+Sub moors
+	/echo \ag--\atZoning into PoK \ag--
+	/travelto "The Plane of Knowledge"
+	/while (${Navigation.Active}) {
+		/delay 5s
+	}
+	/delay 15s ${Zone.Name.Equal[The Plane of Knowledge]}==TRUE
+	/delay 1s
+/return
+|--------------------------------------------------------------------------------
+
+| --------------------------------------------------------------------------------------------
+| SUB: crescent
+| --------------------------------------------------------------------------------------------
+Sub crescent
+	/echo \ag--\atZoning to Moors \ag--
+	/travelto "Blightfire Moors"
+	/while (${Navigation.Active}) {
+		/delay 5s
+	}
+	/delay 15s ${Zone.Name.Equal[Blightfire Moors]}==TRUE
+	/delay 1s
+/return
+|--------------------------------------------------------------------------------
+
+| --------------------------------------------------------------------------------------------
+| SUB: poknowledge
+| --------------------------------------------------------------------------------------------
+Sub poknowledge
+	/echo \ag--\atZoning to Guild Lobby \ag--
+	/travelto "Guild Lobby"
+	/while (${Navigation.Active}) {
+		/delay 5s
+	}
+	/delay 120s ${Zone.Name.Equal[Guild Lobby]}==TRUE
+	/delay 1s
+/return
+|--------------------------------------------------------------------------------
+
+| --------------------------------------------------------------------------------------------
+| SUB: GetCorpse
+| --------------------------------------------------------------------------------------------
+	
+Sub GetCorpse
+	/call NavTo "Priestess of Luclin"
+	/target "Priestess of Luclin"
+	/say Summon
+/return
+| --------------------------------------------------------------------------------------------
+| SUB: NavTo
+| --------------------------------------------------------------------------------------------
+Sub NavTo(navnpc)
+	
+	/nav spawn npc ${navnpc}
+    /while (${Navigation.Active}) {
+        /if (${Spawn[npc ${navnpc}].Distance3D} < 20) /break
+        /delay 5
+    }
+    /squelch /target npc ${navnpc}
+    /delay 2s ${Target.ID}==${Spawn[npc ${navnpc}].ID}
+    /face
+/return
+|--------------------------------------------------------------------------------
+
+| --------------------------------------------------------------------------------------------
+| SUB: usethrone
+| --------------------------------------------------------------------------------------------
+Sub UseThrone
+	/while (!${Me.AltAbilityReady[Throne of Heroes]}) {
+		/echo \ag--\atThrone not ready, trying Origin\ag
+		/delay 30s
+		/call UseOrigin
+		/return
+		/delay 10s
+	}
+	/echo \ag--\atUsing Throne of Heroes to get to Guild Lobby\ag--
+	/alt act 511
+	/delay 5
+	/while (${Me.Casting.ID}) {
+		/delay 1s
+	}
+	/delay 15s ${Zone.Name.Find[${Throne of Heroes}]}
+	/delay 2
+/return
+|--------------------------------------------------------------------------------
+
+| --------------------------------------------------------------------------------------------
+| SUB: useorigin
+| --------------------------------------------------------------------------------------------
+Sub UseOrigin
+	/while (!${Me.AltAbilityReady[Origin]}) {
+		/echo \ag--\atOrigin not ready, re-checking in 30s\ag
+		/delay 30s
+		/call UseThrone
+		/return
+		/delay 30s
+	}
+	/echo \ag--\atUsing Origin to get to your Origin Home\ag--
+	/echo \ag--\atSo we can get to the Guild Lobby\ag--
+	/alt act 331
+	/delay 5
+	/while (${Me.Casting.ID}) {
+		/delay 1s
+	}
+	/delay 15s ${Zone.Name.Find[${Origin}]}
+	/delay 2
+/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: Revive Merc
+|--------------------------------------------------------------------------------
+	Sub ReviveMerc
+
+:MercReviveLoop
+	/declare j int local 0
+	
+	:loop
+	/if (!${Mercenary.State.Equal[ACTIVE]}) {
+		/echo \ayAttempting to revive my mercenary every 15 seconds for 5 minutes.
+		/nomodkey /notify MMGW_ManageWnd MMGW_SuspendButton LeftMouseUp
+		/delay 1s
+		/doevents
+		/delay 14s
+	}
+	/if (!${Mercenary.State.Equal[ACTIVE]}) {
+		/echo \ayWaiting until mercenary can be revived.
+		/varcalc j ${j} + 1
+	/if (${j} < 20)	/goto :loop
+	/echo \ayUnable to revive a healer mercenary. Ending Macro.
+	/end
+	} else {
+		/varset MercClass ${Mercenary.Class}
+		/echo \agMy mercenary's class is \ay[\ap(${MercClass})\ay]\ag.
+	}
+
+|-----------------------------------------------------
+|---------------- Check to make sure merc is a healer!
+|-----------------------------------------------------
+	/if (${MercClass.NotEqual[Cleric]}) {
+		/for i 1 to 8
+			/echo \ayLooking at merc slot (${i}), (${Window[MMGW_ManageWnd].Child[MMGW_OwnedListBox].List[${i},2]}).
+		|/notify MMGW_ManageWnd MMGW_OwnedListBox listselect ${i}
+			/if (${Window[MMGW_ManageWnd].Child[MMGW_OwnedListBox].List[${i},2].Find[Healer]}) {
+				/echo \agFOUND A HEALER! - (${Window[MMGW_ManageWnd].Child[MMGW_OwnedListBox].List[${i},2]})
+				/echo \atSwitching mercenary to:(${Window[MMGW_ManageWnd].Child[MMGW_OwnedListBox].List[${i},2]}).
+				/notify MMGW_ManageWnd MMGW_OwnedListBox listselect ${i}
+				/notify MMGW_ManageWnd MMGW_SwitchButton leftmouseup
+				/delay 10
+				/return
+			}
+			/delay 10
+		/next i
+	}
+| --------------------------------------------------------------------------------------------
+
+|---------------------------------------------------------------
+|---------------- Check to make sure merc stance is not passive!
+|---------------------------------------------------------------
+	/if (${Mercenary.Stance.Equal[Passive]}) /stance Balanced
+
+	/return
+|--------------------------------------------------------------------------------
+
+|--------------------------------------------------------------------------------
+|SUB: TakeRez
+|--------------------------------------------------------------------------------
+	Sub TakeRez
+|--------------------------------------------------------------------------------
+|---------------- Check to make sure merc stance is not passive!
+|--------------------------------------------------------------------------------
+	/if (${Mercenary.Stance.Equal[Passive]}) /stance Balanced
+
+	/echo \ayAccepting a rez if available.
+	/delay 6s
+
+:RezWait
+	/if (${Window[ConfirmationDialogBox].Open} && (${Spawn[${Me.ID}].Type.Equal[Corpse]})) {
+		/echo \agI have a rez box, accepting now.
+		/nomodkey /notify ConfirmationDialogBox Yes_Button leftmouseup
+		/delay 2s
+		/multiline ; /echo Respawning ; /notify RespawnWnd RW_OptionsList listselect 2 ; /notify RespawnWnd RW_SelectButton leftmouseup
+		/delay 10
+		/return
+		}   else {
+			/echo \ayWaiting 6 seconds for a rez.
+			/delay 6s
+		}
+
+		/if (${Spawn[${Me.ID}].Type.Equal[Corpse]}) /goto :RezWait
+
+		/return
+	|--------------------------------------------------------------------------------
+
+	|--------------------------------------------------------------------------------
+	|SUB: Suspend Merc
+	|--------------------------------------------------------------------------------
+		Sub SuspendMerc
+
+	:MercSuspendLoop
+		/if (${Mercenary.State.Equal[ACTIVE]}) {
+			/echo \aySuspending Mercenary.
+			/nomodkey /notify MMGW_ManageWnd MMGW_SuspendButton LeftMouseUp
+			/delay 3s
+		}
+		/if (${Mercenary.State.Equal[ACTIVE]}) /goto :MercSuspendLoop
+
+		/return
+	|--------------------------------------------------------------------------------
+
+	|--------------------------------------------------------------------------------
+	|SUB: PluginCheck
+	|--------------------------------------------------------------------------------
+		Sub PluginCheck
+
+		/echo \atChecking for required plugins . . .
+
+		/if (!${Plugin[MQ2MoveUtils].Name.Equal[MQ2MoveUtils]}) {
+			/echo \atLoading MQ2MoveUtils plugin, because this macro requires it !
+			/squelch /plugin MQ2MoveUtils load
+			/delay 1s
+			/if (!${Plugin[MQ2MoveUtils].Name.Equal[MQ2MoveUtils]}) {
+				/beep
+				/echo \ayUnable to load MQ2MoveUtils plugin, quiting.
+				/end
+			}
+		} else {
+			/echo \agMQ2MoveUtils plugin is loaded.
+		}
+
+		/echo \agPlugin check complete . . .
+
+		/return
+	|--------------------------------------------------------------------------------
+	| SUB: Event_Gold
+	| --------------------------------------------------------------------------------------------
+	Sub Event_Gold
+	/echo \ag--\atYou need a Gold Membership to use this mercenary \ag--
+	/doevents flush Gold
+	/end
+	/return
+	
+	|SUB: LogMeOut
+	|--------------------------------------------------------------------------------
+		Sub LogMeOut
+
+		/echo \agTime to camp out!
+		/keypress forward
+		/beep
+		/if (!${Me.Sitting} && !${Me.Mount.ID}) /sit
+		/delay 45s
+		/camp desktop
+		/endmacro
+
+		/return
+	|--------------------------------------------------------------------------------

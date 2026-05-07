@@ -1,0 +1,161 @@
+| MonkTrainer.mac v.1.3 By Maskoi 10/10/2011 RedGuides.com
+|
+| Requires MQ2MoveUtils
+|
+| How to use with pet class or someone else's merc and /duel:
+| 1. Make sure you have hot key for all of your abilities somewhere.
+| 2. Group with a Cleric merc and a pet class or a toon with their merc about the same level so it is light blue/blue to you.
+| 3. Find a secluded spot in a zone where no one will bug you not PoK, GL or GH.
+| 4. Target each other and /d for duel.
+| 5. Target the pet or merc and type /mac monktrainer.
+| 6. Type /mac monktrainer
+| 7. Have the pet attack of you want to raise defensive skills.
+|
+| How to use with Cleric Merc in Arena.
+| WARNING The Arena is a public zone. You can easily be seen or worse killed by other players while AFK.
+| Make sure you have hot key for all of your abilities somewhere.
+| 1. Goto the Arena Zone with your cleric merc. Stone is in neutral area of PoK
+| 2. Enter the Arena
+| 3. Set your merc to Efficient or Balanced
+| 4. Target your merc
+| 5. Type /mac monktrainer
+
+	#Event SkillUp "You have become better at #1#! (#2#)"
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: Main
+| --------------------------------------------------------------------------------------------
+	Sub Main
+	/declare Ver                    string          outer   1.3
+	/declare SkillName[9]           string          outer
+	/declare CurrentZone            int             outer   ${Zone.ID}
+	/declare MyTargetID             int             outer   ${Target.ID}
+	/declare MyTargetName           string          outer   ${Target.CleanName}
+
+| Skill name,Level attained
+
+	/varset SkillName[1]      Kick,1
+	/varset SkillName[2]      Mend,1
+	/varset SkillName[3]      Intimidation,1
+	/varset SkillName[4]      Round Kick,5
+	/varset SkillName[5]      Tiger Claw,10
+	/varset SkillName[6]      Feign Death,17
+	/varset SkillName[7]      Eagle Strike,20
+	/varset SkillName[8]      Dragon Punch,25
+	/varset SkillName[9]      Flying Kick,30
+
+	/if (${Bool[${Plugin[MQ2Melee]}]}) /melee plugin=0
+	/if (!${Bool[${Plugin[MQ2Moveutils]}]}) /plugin mq2moveutils
+	/delay 10
+	/if (!${Bool[${Plugin[MQ2Moveutils]}]}) {
+		/echo macro requires MQ2moveutils
+		/end
+	}
+
+	/echo Redguides.com presents
+	/echo Maskoi's Ultimate Monk Trainer v ${Ver}
+	/delay 10
+	/echo Traning You
+	/call Init
+	/delay 10
+
+:MainLoop
+	/call MercMed
+	/call DoSkill
+	/call AreWeDone
+	/doevents
+	/goto :MainLoop
+
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: DoSkill
+| --------------------------------------------------------------------------------------------
+	Sub DoSkill
+	/declare i int local
+	/delay 10
+	/for i 1 to 9
+		/doevents
+
+		/if (${Me.Level}<${SkillName[${i}].Arg[2,,]}) /goto :NextSkill
+		/if (${Me.Skill[${SkillName[${i}].Arg[1,,]}]} == ${Me.SkillCap[${SkillName[${i}].Arg[1,,]}]}) /goto :NextSkill
+		/target id ${MyTargetID}
+		/stick 10 front
+		/face fast
+
+		/if (${Me.Skill[${SkillName[${i}].Arg[1,,]}]} < ${Me.SkillCap[${SkillName[${i}].Arg[1,,]}]}) {
+		:wait
+			/if (!${Me.AbilityReady[${SkillName[${i}].Arg[1,,]}]}) /goto :NextSkill
+			/delay 5
+			/doability "${SkillName[${i}].Arg[1,,]}"
+			/if (${Me.Race.Name.Equal[iksar]} && ${i}==8) {
+				/echo TRAINING => Tail Rake <= ${Me.Skill[${SkillName[${i}].Arg[1,,]}]}/${Me.SkillCap[${SkillName[${i}].Arg[1,,]}]}
+			} else {
+				/echo TRAINING => ${SkillName[${i}].Arg[1,,]} <= ${Me.Skill[${SkillName[${i}].Arg[1,,]}]}/${Me.SkillCap[${SkillName[${i}].Arg[1,,]}]}
+			}
+		}
+
+	:NextSkill
+	/next i
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: Init
+| --------------------------------------------------------------------------------------------
+	Sub Init
+	/echo Skill Level/Skill Cap
+	/declare i int local
+	/for i 1 to 9
+		/if (${Me.Race.Name.Equal[iksar]} && ${i}==8) {
+			/echo Tail Rake: ${Me.Skill[${SkillName[${i}].Arg[1,,]}]}/${Me.SkillCap[${SkillName[${i}].Arg[1,,]}]}
+		} else {
+			/echo ${SkillName[${i}].Arg[1,,]}: ${Me.Skill[${SkillName[${i}].Arg[1,,]}]}/${Me.SkillCap[${SkillName[${i}].Arg[1,,]}]}
+		}
+	/next i
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: Event_SkillUp
+| --------------------------------------------------------------------------------------------
+	Sub Event_SkillUp(S0,S1,S2)
+	/echo >> Your ${S1} skill is now ${S2}. <<
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: AreWeDone
+| --------------------------------------------------------------------------------------------
+	Sub AreWeDone
+	/declare i int local
+	/declare j int local 0
+	/for i 1 to 9
+		/if (${Me.Skill[${SkillName[${i}].Arg[1,,]}]} == ${Me.SkillCap[${SkillName[${i}].Arg[1,,]}]}) /varcalc j ${j}+1
+		/if (${j}==9) {
+			/echo All skills are currently maxed. Ending macro.
+			/attack off
+			/stick off
+			/end
+		}
+	/next i
+	/return
+
+
+| --------------------------------------------------------------------------------------------
+| SUB: MercMed
+| --------------------------------------------------------------------------------------------
+	Sub MercMed
+	/if (${Spawn[cleric mercenary ${MyTargetName}].ID} && ${Me.Mercenary.Equal[Active]} &&  ${Spawn[cleric mercenary ${MyTargetName}].CurrentMana} <=10) {
+		/echo Waitng for my stupid merc to med to 90 mana
+	:WaitMercMed
+		/delay 10
+		/if (${Spawn[cleric mercenary ${MyTargetName}].CurrentMana} < 90) /goto :WaitMercMed
+		/echo Stupid merc finally at 90% mana contimuing.
+	}
+	/return
+
+
+|  [+++  Formatted by MQ2fusing tabs for indents +++]

@@ -1,0 +1,3 @@
+[submodule "rgmercs/manuals"]
+	path = rgmercs/manuals
+	url = git@gitlab.com:redguides/rgmercs.wiki.git
