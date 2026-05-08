@@ -1,0 +1,4 @@
+# Prevent local AutoLogin credential cache from being committed
+config/login.db
+config/login.db-shm
+config/login.db-wal
