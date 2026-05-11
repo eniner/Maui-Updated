@@ -147,8 +147,11 @@ local integrationStatusCache = {}
 local integrationStatusNextRefresh = 0
 local integrationStatusRefreshMs = 500
 local pendingLuaConsoleRestartAt = nil
+--- After preset swap, /memmyspells must not run from ImGui mid-frame while a prior mem bind is still active.
+local pendingMemAfterPresetAt = nil
 local actionCooldowns = {
-    memspells = 1.0,
+    --- /memmyspells is a long-running MQ bind; overlapping calls cause "Can't execute bind while another bind is in progress".
+    memspells = 75.0,
     savegems = 1.0,
     upgrades = 1.5,
     downgrades = 1.5,
@@ -526,12 +529,14 @@ local function RefreshDirtyState()
     isDirty = (current ~= lastSavedFingerprint)
 end
 
-local function TryBeginAction(actionName)
+local function TryBeginAction(actionName, silent)
     local now = actionNowFn()
     local cooldown = actionCooldowns[actionName] or 1.0
     local lastAt = actionLastAt[actionName] or -999
     if (now - lastAt) < cooldown then
-        bottomActionMsg = string.format('%s: wait %.1fs', actionName, cooldown - (now - lastAt))
+        if not silent then
+            bottomActionMsg = string.format('%s: wait %.1fs', actionName, cooldown - (now - lastAt))
+        end
         return false
     end
     actionLastAt[actionName] = now
@@ -2224,7 +2229,11 @@ ReloadINIFromDisk = function()
     end
 end
 
---- Hero: centered UltimateEQAssist title (mockup), then identity + Solo/Group/Raid on row 2.
+--- Forward declaration: real body is below; earlier UI (banner) must resolve the same local (Lua 5.1).
+local ApplySetupPreset
+local UltimateAssistAutoProfileBuilder
+
+--- Hero: UltimateEQAssist title row + Auto Profile Builder (replaces separate Solo/Group/Raid buttons).
 local function DrawUltimateModeBanner()
     local title = 'UltimateEQAssist'
     local tw = ImGui.CalcTextSize(title)
@@ -2239,35 +2248,26 @@ local function DrawUltimateModeBanner()
     ImGui.SameLine()
     ImGui.TextColored(0.82, 0.76, 1.0, 1, string.format('%s · %s · Lv%s', cls, cname, clvl))
 
-    ImGui.SameLine(ImGui.GetWindowWidth() - 360)
-    ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 10, 6)
-    local modes = {'Solo', 'Group', 'Raid'}
+    local bannerBtnW = math.min(420, math.max(260, ImGui.GetWindowWidth() * 0.44))
+    ImGui.SameLine(ImGui.GetWindowWidth() - bannerBtnW - 16)
+    ImGui.BeginGroup()
+    ImGui.TextColored(0.70, 0.66, 0.82, 1.0, 'Solo · Group · Raid')
     local P = UltimateAssistPalette
-    for _, m in ipairs(modes) do
-        local sel = (tostring(MauiRuntime.quickProfile):upper() == m:upper())
-        if sel then
-            ImGui.PushStyleColor(ImGuiCol.Button, P.modeSel[1], P.modeSel[2], P.modeSel[3], P.modeSel[4])
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, P.modeSelHov[1], P.modeSelHov[2], P.modeSelHov[3], P.modeSelHov[4])
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, P.modeSel[1] * 0.85, P.modeSel[2] * 0.85, P.modeSel[3] * 0.85, 1)
-            ImGui.PushStyleColor(ImGuiCol.Border, P.modeSelBorder[1], P.modeSelBorder[2], P.modeSelBorder[3], P.modeSelBorder[4])
-            ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 2)
-            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 10)
-        else
-            ImGui.PushStyleColor(ImGuiCol.Button, P.modeUnsel[1], P.modeUnsel[2], P.modeUnsel[3], P.modeUnsel[4])
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, P.modeUnselHov[1], P.modeUnselHov[2], P.modeUnselHov[3], P.modeUnselHov[4])
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, P.modeUnsel[1], P.modeUnsel[2], P.modeUnsel[3], 1)
-            ImGui.PushStyleColor(ImGuiCol.Border, P.modeUnselBorder[1], P.modeUnselBorder[2], P.modeUnselBorder[3], P.modeUnselBorder[4])
-            ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1)
-            ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 10)
-        end
-        if ImGui.Button(m .. '##qsmode_' .. m, 84, 30) then
-            ApplySetupPreset(m)
-        end
-        ImGui.PopStyleVar(2)
-        ImGui.PopStyleColor(4)
-        ImGui.SameLine()
+    ImGui.PushStyleColor(ImGuiCol.Button, P.modeSel[1] * 0.55, P.modeSel[2] * 0.55, P.modeSel[3] * 0.85, 1)
+    ImGui.PushStyleColor(ImGuiCol.ButtonHovered, P.modeSelHov[1], P.modeSelHov[2], P.modeSelHov[3], P.modeSelHov[4])
+    ImGui.PushStyleColor(ImGuiCol.ButtonActive, P.modeSel[1] * 0.45, P.modeSel[2] * 0.45, P.modeSel[3] * 0.75, 1)
+    ImGui.PushStyleColor(ImGuiCol.Border, P.modeSelBorder[1], P.modeSelBorder[2], P.modeSelBorder[3], 0.9)
+    ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, 10, 9)
+    ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 10)
+    if ImGui.Button('Ultimate Assist Auto Profile Builder##uea_apb', bannerBtnW, 0) then
+        UltimateAssistAutoProfileBuilder()
     end
-    ImGui.PopStyleVar(1)
+    ImGui.PopStyleVar(2)
+    ImGui.PopStyleColor(4)
+    if ImGui.IsItemHovered() then
+        ImGui.SetTooltip('Creates missing Raid preset INIs for every class under config/UltimateEQAssist/Templates (from Group/Solo/KA/class shells), then loads the Raid profile for this character.\nThis is the one-click path — no separate mode buttons.')
+    end
+    ImGui.EndGroup()
 end
 
 local function DrawUltimateIniSettingsRow()
@@ -3383,7 +3383,7 @@ local function DrawReadmeTab()
             if readmeJumpToTab == 'Start Here' then readmeJumpToTab = nil end
             ImGui.TextWrapped('5-minute safe startup for new users (level 80 baseline):')
             ImGui.Spacing()
-            ImGui.BulletText('1) In UI tab, click Quick Setup: Solo, Group, or Raid.')
+            ImGui.BulletText('1) In UI tab, click Ultimate Assist Auto Profile Builder (seeds Raid presets for all classes, loads Raid for your toon).')
             ImGui.BulletText('2) In Step 1, enable Combat + Buffs + Heals. Enable Pet only if your class uses pet.')
             ImGui.BulletText('3) In Step 2/3, keep recommended values: ChaseDistance 20-35, MedStart 20-35, CastRetries 2-4.')
             ImGui.BulletText('4) Click Save Config, then click Preflight.')
@@ -3999,7 +3999,7 @@ local function SetSectionEnabled(sectionName, enabled)
     end
 end
 
-local function ApplySetupPreset(presetName)
+ApplySetupPreset = function(presetName)
     local existingConfig = globals.Config
 
     local function MergeMissingConfig(targetCfg, sourceCfg)
@@ -4081,6 +4081,7 @@ local function ApplySetupPreset(presetName)
         return ordered
     end
 
+    --- Preset files must win over generic class INIs, or Solo/Group/Raid all load the same spells.
     local function FindPresetTemplateFile(levelNow, classShort, presetUpper)
         local templatesRoot = NormalizePath(mq.configDir .. '/UltimateEQAssist/Templates')
         local importedRoot = NormalizePath(templatesRoot .. '/ImportedRG')
@@ -4098,22 +4099,40 @@ local function ApplySetupPreset(presetName)
         local orderedBuckets = GetOrderedLevelBuckets(levelNow, roots)
         for _, bucket in ipairs(orderedBuckets) do
             local prefix = string.format('UltimateEQAssist_L%d_%s_%s', bucket, classShort, presetUpper)
-            local candidates = {
-                string.format('%s/Level%d/KAHybrid/%s_KAHYBRID.ini', importedRoot, bucket, prefix),
-                string.format('%s/Level%d/Presets/%s.ini', importedRoot, bucket, prefix),
-                string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', importedRoot, bucket, bucket, classShort),
-                string.format('%s/Level%d/KAHybrid/%s_KAHYBRID.ini', templatesRoot, bucket, prefix),
-                string.format('%s/Level%d/Presets/%s.ini', templatesRoot, bucket, prefix),
-                string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', templatesRoot, bucket, bucket, classShort),
-                string.format('%s/UltimateEQAssist_%s.ini', templatesRoot, classShort),
-            }
-            for _, p in ipairs(candidates) do
-                if utils.FileExists(p) then
-                    return p, bucket
+            for _, root in ipairs(roots) do
+                local presetPaths = {
+                    string.format('%s/Level%d/KAHybrid/%s_KAHYBRID.ini', root, bucket, prefix),
+                    string.format('%s/Level%d/Presets/%s.ini', root, bucket, prefix),
+                }
+                for _, p in ipairs(presetPaths) do
+                    if utils.FileExists(p) then
+                        return p, bucket
+                    end
+                end
+            end
+            for _, root in ipairs(roots) do
+                local classShell = string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', root, bucket, bucket, classShort)
+                if utils.FileExists(classShell) then
+                    return classShell, bucket
                 end
             end
         end
+        for _, root in ipairs(roots) do
+            local legacy = string.format('%s/UltimateEQAssist_%s.ini', root, classShort)
+            if utils.FileExists(legacy) then
+                return legacy, levelNow
+            end
+        end
         return nil
+    end
+
+    --- Preset-named file (Presets/*.ini or *_[PRESET]_KAHYBRID.ini), not shared class shell.
+    local function isPresetKeyedTemplatePath(path, presetUpper)
+        local u = tostring(presetUpper or ''):upper()
+        local base = path:match('([^/\\]+)$') or ''
+        base = base:upper()
+        local pat = '_' .. u
+        return base:find(pat .. '_', 1, true) ~= nil or base:find(pat .. '.INI', 1, true) ~= nil
     end
 
     local function CountConfigSections(cfg)
@@ -4143,28 +4162,46 @@ local function ApplySetupPreset(presetName)
             return nil, nil, 0
         end
 
+        local function considerPath(p, bucket, bestPath, bestBucket, bestScore)
+            if not p or not utils.FileExists(p) then
+                return bestPath, bestBucket, bestScore
+            end
+            local cfg = LIP.load(p, false)
+            local score = CountConfigSections(cfg)
+            if not bestPath or score > bestScore or (score == bestScore and (not bestBucket or bucket > bestBucket)) then
+                return p, bucket, score
+            end
+            return bestPath, bestBucket, bestScore
+        end
+
         local bestPath, bestBucket, bestScore = nil, nil, 0
         local orderedBuckets = GetOrderedLevelBuckets(levelNow, roots)
+
+        --- Prefer richest *preset-named* ini so merge does not inflate Solo from shared class shell.
         for _, bucket in ipairs(orderedBuckets) do
             local prefix = string.format('UltimateEQAssist_L%d_%s_%s', bucket, classShort, presetUpper)
-            local candidates = {
-                string.format('%s/Level%d/KAHybrid/%s_KAHYBRID.ini', importedRoot, bucket, prefix),
-                string.format('%s/Level%d/Presets/%s.ini', importedRoot, bucket, prefix),
-                string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', importedRoot, bucket, bucket, classShort),
-                string.format('%s/Level%d/KAHybrid/%s_KAHYBRID.ini', templatesRoot, bucket, prefix),
-                string.format('%s/Level%d/Presets/%s.ini', templatesRoot, bucket, prefix),
-                string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', templatesRoot, bucket, bucket, classShort),
-                string.format('%s/UltimateEQAssist_%s.ini', templatesRoot, classShort),
-            }
-            for _, p in ipairs(candidates) do
-                if utils.FileExists(p) then
-                    local cfg = LIP.load(p, false)
-                    local score = CountConfigSections(cfg)
-                    if not bestPath or score > bestScore or (score == bestScore and (not bestBucket or bucket > bestBucket)) then
-                        bestPath, bestBucket, bestScore = p, bucket, score
-                    end
+            for _, root in ipairs(roots) do
+                for _, p in ipairs({
+                    string.format('%s/Level%d/KAHybrid/%s_KAHYBRID.ini', root, bucket, prefix),
+                    string.format('%s/Level%d/Presets/%s.ini', root, bucket, prefix),
+                }) do
+                    bestPath, bestBucket, bestScore = considerPath(p, bucket, bestPath, bestBucket, bestScore)
                 end
             end
+        end
+        if bestPath then
+            return bestPath, bestBucket, bestScore
+        end
+
+        for _, bucket in ipairs(orderedBuckets) do
+            for _, root in ipairs(roots) do
+                local p = string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', root, bucket, bucket, classShort)
+                bestPath, bestBucket, bestScore = considerPath(p, bucket, bestPath, bestBucket, bestScore)
+            end
+        end
+        for _, root in ipairs(roots) do
+            local p = string.format('%s/UltimateEQAssist_%s.ini', root, classShort)
+            bestPath, bestBucket, bestScore = considerPath(p, levelNow, bestPath, bestBucket, bestScore)
         end
         return bestPath, bestBucket, bestScore
     end
@@ -4287,6 +4324,7 @@ local function ApplySetupPreset(presetName)
     local classShort = tostring(globals.MyClass or ''):upper()
     local presetUpper = tostring(presetName or 'GROUP'):upper()
     local templatePath, bucket = FindPresetTemplateFile(levelNow, classShort, presetUpper)
+    local presetKeyedIni = templatePath and isPresetKeyedTemplatePath(templatePath, presetUpper)
 
     if templatePath then
         globals.Config = LIP.load(templatePath, false) or BuildFallbackCleanConfig()
@@ -4333,7 +4371,9 @@ local function ApplySetupPreset(presetName)
     Save()
     globals.INIFileContents = utils.ReadRawINIFile()
     if mySpellsGemCount > 0 then
-        CmdMemMySpells(globals.INIFile)
+        --- Defer mem to main loop (stagger past Save) so rapid Solo/Group/Raid swaps do not stack /memmyspells binds.
+        pendingMemAfterPresetAt = mq.gettime() + 1200
+        mySpellsNote = mySpellsNote .. ' — MemSpells queued'
     end
     if templatePath then
         local sourceKind = templatePath:find('/KAHybrid/', 1, true) and 'KAHybrid' or (templatePath:find('/Presets/', 1, true) and 'Preset' or 'Class')
@@ -4342,15 +4382,109 @@ local function ApplySetupPreset(presetName)
         if inferredSizes > 0 or autoDisabled > 0 then
             normalizeNote = string.format(' [normalized sizes: +%d inferred, %d auto-disabled]', inferredSizes, autoDisabled)
         end
+        local genericNote = (not presetKeyedIni) and string.format(' · using shared class INI — add `%s/UltimateEQAssist/Templates/Level#/Presets/UltimateEQAssist_L#_%s_%s.ini` for different spells per mode', mq.configDir, classShort, presetUpper) or ''
         if switchedToCharINI then
-            bottomActionMsg = string.format('Preset applied: %s from %s (switched to %s)%s%s', presetName, fromLabel, tostring(globals.INIFile), normalizeNote, mySpellsNote)
+            bottomActionMsg = string.format('Preset applied: %s from %s (switched to %s)%s%s%s', presetName, fromLabel, tostring(globals.INIFile), normalizeNote, mySpellsNote, genericNote)
         else
-            bottomActionMsg = string.format('Preset applied: %s from %s%s%s', presetName, fromLabel, normalizeNote, mySpellsNote)
+            bottomActionMsg = string.format('Preset applied: %s from %s%s%s%s', presetName, fromLabel, normalizeNote, mySpellsNote, genericNote)
         end
     else
         bottomActionMsg = string.format('Preset applied: %s (fallback baseline; no template found)%s%s', presetName, ((inferredSizes > 0 or autoDisabled > 0) and string.format(' [normalized sizes: +%d inferred, %d auto-disabled]', inferredSizes, autoDisabled) or ''), mySpellsNote)
     end
     MauiRuntime.quickProfile = tostring(presetName or 'Group')
+end
+
+--- One-click: seed UltimateEQAssist ..._RAID.ini for all classes per level bucket, then load Raid for current toon.
+local UEA_APB_CLASSES = {
+    'BER', 'BRD', 'BST', 'CLR', 'DRU', 'ENC', 'MAG', 'MNK', 'NEC', 'PAL', 'RNG', 'ROG', 'SHD', 'SHM', 'WAR', 'WIZ',
+}
+
+local function EnsurePresetsDirForBucket(templatesRoot, bucket)
+    local levelDir = NormalizePath(string.format('%s/Level%d', templatesRoot, bucket))
+    local presetsDir = NormalizePath(string.format('%s/Level%d/Presets', templatesRoot, bucket))
+    if lfs.attributes(presetsDir, 'mode') == 'directory' then
+        return true
+    end
+    if lfs.attributes(levelDir, 'mode') ~= 'directory' then
+        lfs.mkdir(levelDir)
+    end
+    lfs.mkdir(presetsDir)
+    return lfs.attributes(presetsDir, 'mode') == 'directory'
+end
+
+UltimateAssistAutoProfileBuilder = function()
+    local templatesRoot = NormalizePath(mq.configDir .. '/UltimateEQAssist/Templates')
+    local importedRoot = NormalizePath(templatesRoot .. '/ImportedRG')
+    local scanRoots = {}
+    if lfs.attributes(templatesRoot, 'mode') == 'directory' then
+        table.insert(scanRoots, templatesRoot)
+    end
+    if lfs.attributes(importedRoot, 'mode') == 'directory' then
+        table.insert(scanRoots, importedRoot)
+    end
+
+    local bucketSet = {}
+    for _, root in ipairs(scanRoots) do
+        for entry in lfs.dir(root) do
+            local n = tonumber(tostring(entry):match('^Level(%d+)$'))
+            if n then
+                bucketSet[n] = true
+            end
+        end
+    end
+    local buckets = {}
+    for n in pairs(bucketSet) do
+        table.insert(buckets, n)
+    end
+    table.sort(buckets)
+    if #buckets == 0 then
+        table.insert(buckets, tonumber(globals.MyLevel) or 75)
+    end
+
+    local created, existed, miss = 0, 0, 0
+    if lfs.attributes(templatesRoot, 'mode') == 'directory' then
+        for _, bucket in ipairs(buckets) do
+            if not EnsurePresetsDirForBucket(templatesRoot, bucket) then
+                break
+            end
+            local presetsDir = NormalizePath(string.format('%s/Level%d/Presets', templatesRoot, bucket))
+            for _, CLS in ipairs(UEA_APB_CLASSES) do
+                local raidName = string.format('UltimateEQAssist_L%d_%s_RAID.ini', bucket, CLS)
+                local raidPath = NormalizePath(presetsDir .. '/' .. raidName)
+                if utils.FileExists(raidPath) then
+                    existed = existed + 1
+                else
+                    local src
+                    for _, root in ipairs(scanRoots) do
+                        local tryList = {
+                            string.format('%s/Level%d/Presets/UltimateEQAssist_L%d_%s_GROUP.ini', root, bucket, bucket, CLS),
+                            string.format('%s/Level%d/Presets/UltimateEQAssist_L%d_%s_SOLO.ini', root, bucket, bucket, CLS),
+                            string.format('%s/Level%d/KAHybrid/UltimateEQAssist_L%d_%s_RAID_KAHYBRID.ini', root, bucket, bucket, CLS),
+                            string.format('%s/Level%d/UltimateEQAssist_L%d_%s.ini', root, bucket, bucket, CLS),
+                        }
+                        for _, p in ipairs(tryList) do
+                            if utils.FileExists(p) then
+                                src = p
+                                break
+                            end
+                        end
+                        if src then break end
+                    end
+                    if src and utils.CopyFile(src, raidPath) then
+                        created = created + 1
+                    else
+                        miss = miss + 1
+                    end
+                end
+            end
+        end
+    end
+
+    ApplySetupPreset('Raid')
+    local head = string.format('[Auto Profile Builder · Solo/Group/Raid → Raid: +%d files · %d already · %d no template] ',
+        created, existed, miss)
+    bottomActionMsg = head .. tostring(bottomActionMsg or '')
+    print(('[MAUI] Ultimate Assist Auto Profile Builder: Raid templates +%d new, %d existed, %d missing source'):format(created, existed, miss))
 end
 
 local function DrawSetupModuleToggle(label, sectionName, openTabName)
@@ -4408,7 +4542,7 @@ local function DrawSetupTab()
 
     ImGui.TextColored(Ps.textTitle[1], Ps.textTitle[2], Ps.textTitle[3], Ps.textTitle[4], 'Quick Setup')
     ImGui.Spacing()
-    ImGui.TextColored(Ps.textMuted[1], Ps.textMuted[2], Ps.textMuted[3], Ps.textMuted[4], 'Import a profile from Solo / Group / Raid above, tune modules, then confirm the validation strip before Start.')
+    ImGui.TextColored(Ps.textMuted[1], Ps.textMuted[2], Ps.textMuted[3], Ps.textMuted[4], 'Use Ultimate Assist Auto Profile Builder at the top to load the recommended Raid profile, then tune modules and confirm the validation strip before Start.')
     ImGui.Spacing()
     ImGui.TextColored(Ps.textTitle[1], Ps.textTitle[2], Ps.textTitle[3], Ps.textTitle[4], string.format('%s  ·  %s  ·  %s', classShort, profileMode, tostring(globals.INIFile or 'Unknown')))
     ImGui.TextColored(Ps.textOk[1], Ps.textOk[2], Ps.textOk[3], Ps.textOk[4], 'Recommended ranges — ChaseDistance 20–35 · MedStart 20–35 · CastRetries 2–4')
@@ -4648,11 +4782,7 @@ local function DrawMiniSetupWindow()
     ImGui.TextColored(0.45, 0.95, 0.55, 1.0, 'Safe ranges: ChaseDistance 20-35, MedStart 20-35, CastRetries 2-4')
     ImGui.Spacing()
 
-    if ImGui.Button('Solo', 84, 0) then ApplySetupPreset('Solo') end
-    ImGui.SameLine()
-    if ImGui.Button('Group', 84, 0) then ApplySetupPreset('Group') end
-    ImGui.SameLine()
-    if ImGui.Button('Raid', 84, 0) then ApplySetupPreset('Raid') end
+    if ImGui.Button('Ultimate Assist Auto Profile Builder##mini_apb', 320, 0) then UltimateAssistAutoProfileBuilder() end
     ImGui.SameLine()
     if ImGui.Button('Safe Defaults', 110, 0) then ApplySetupPreset('Group') end
     ImGui.SameLine()
@@ -5638,6 +5768,14 @@ local function RunMauiMainLoop()
         if nowMs >= nextCachePruneAt then
             tloCache:clean()
             nextCachePruneAt = nowMs + cachePruneIntervalMs
+        end
+        if pendingMemAfterPresetAt and mq.gettime() >= pendingMemAfterPresetAt then
+            pendingMemAfterPresetAt = nil
+            if TryBeginAction('memspells', true) then
+                CmdMemMySpells(globals.INIFile)
+            else
+                pendingMemAfterPresetAt = mq.gettime() + 3000
+            end
         end
         mq.delay(20)
     end

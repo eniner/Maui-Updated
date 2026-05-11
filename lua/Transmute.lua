@@ -389,7 +389,7 @@ local function acceptQuantityWnd()
   if not quantityWndOpen() then
     return false
   end
-  -- Stack split: set quantity to 1 then Accept (names vary by client; see prism.lua / MQ docs).
+  -- Stack split: set quantity to 1 then Accept (names vary by client; see ueqcredit.lua / MQ docs).
   pcall(function()
     mq.cmd('/nomodkey /notify QuantityWnd QTYW_slider newvalue 1')
   end)

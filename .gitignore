@@ -2,3 +2,13 @@
 config/login.db
 config/login.db-shm
 config/login.db-wal
+
+# Local logs and dump artifacts
+Logs/
+
+# Common local credential/session artifacts
+config/*AutoLogin*.ini
+config/*Login*.ini
+config/*Account*.ini
+*.db-shm
+*.db-wal
