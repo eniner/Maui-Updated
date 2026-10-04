@@ -1,0 +1,143 @@
+<rml>
+<head>
+	<title>ProEQ Hud</title>
+	<link type="text/template" href="../../rmlui/theme/window.rml"/>
+	<link type="text/rcss" href="hud.rcss"/>
+</head>
+<body template="window">
+	<!-- hero: title, zone, hunter achievement + progress -->
+	<div class="hero">
+		<div class="hero-main">
+			<div class="eyebrow">ProEQ Hud</div>
+			<div id="hero_title" class="hero-title">No hunt in zone</div>
+			<div class="hero-sub">
+				<span id="zone_name">Unknown zone</span>
+				<span class="dotsep">&#183;</span>
+				<span id="hero_prog">--</span>
+			</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico hunt">&#xE735;</div>
+			<div><div id="st_hunt" class="stat-num">--</div><div class="stat-lbl">Hunter</div></div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico quest">&#xE73E;</div>
+			<div><div id="st_chain" class="stat-num">0/0</div><div class="stat-lbl">Quest chain</div></div>
+		</div>
+	</div>
+
+	<!-- toggles -->
+	<div class="toolbar">
+		<div id="tg_min" class="toggle" action="tog:min"><div class="sw"><div class="knob"></div></div><span>Minimize</span></div>
+		<div id="tg_spawned" class="toggle" action="tog:spawned"><div class="sw"><div class="knob"></div></div><span>Spawned only</span></div>
+		<div id="tg_missing" class="toggle" action="tog:missing"><div class="sw"><div class="knob"></div></div><span>Missing hunts</span></div>
+		<div id="tg_quest" class="toggle" action="tog:quest"><div class="sw"><div class="knob"></div></div><span>Quest Mini</span></div>
+		<div id="tg_auto" class="toggle" action="tog:auto"><div class="sw"><div class="knob"></div></div><span>Auto-track</span></div>
+		<div id="tg_see" class="toggle" action="tog:see"><div class="sw"><div class="knob"></div></div><span>See-through</span></div>
+		<div class="spacer"></div>
+		<div class="text-btn stop" action="stop" title="Stop ProEQ Hud">Stop</div>
+	</div>
+
+	<!-- hunter checklist -->
+	<div id="hunter_panel" class="panel hunter">
+		<div class="section-head">
+			<span class="ico">&#xE735;</span>
+			<span>Hunter checklist</span>
+			<span class="spacer"></span>
+			<span class="muted">Click a spawned name to /nav</span>
+		</div>
+		<div id="hunt_bar" class="pbar big">
+			<div id="hunt_fill" class="pfill gold"></div>
+			<div id="hunt_txt" class="ptxt">0/0</div>
+		</div>
+		<div id="hunt_list" class="hunt-list"></div>
+	</div>
+
+	<!-- quest mini -->
+	<div id="quest_panel" class="panel quest">
+		<div class="section-head">
+			<span class="ico">&#xE73E;</span>
+			<span>Quest Mini</span>
+			<span class="spacer"></span>
+			<div id="tg_nav" class="mini-btn" action="tog:nav" title="Hide the tab strip and search">Hide tabs</div>
+			<div id="tg_qmiss" class="mini-btn" action="tog:qmiss" title="Show only unchecked steps">Missing only</div>
+			<div class="mini-btn danger" action="reset:tier" title="Uncheck every step in the current tier">Reset tier</div>
+		</div>
+
+		<div id="nav" class="nav">
+			<div class="tabs">
+				<div id="gt1" class="tab" action="grp:1">T1-2</div>
+				<div id="gt2" class="tab" action="grp:2">T3-6</div>
+				<div id="gt3" class="tab" action="grp:3">T7-10</div>
+				<div id="gt4" class="tab" action="grp:4">T11-13</div>
+				<div id="gt5" class="tab" action="grp:5">T14-15</div>
+				<div id="gt_alt" class="tab alt" action="grp:alt">Alt Cur</div>
+			</div>
+			<div id="tier_tabs" class="tabs sub">
+				<div id="tt1" class="tab small" action="tier:1">-</div>
+				<div id="tt2" class="tab small" action="tier:2">-</div>
+				<div id="tt3" class="tab small" action="tier:3">-</div>
+				<div id="tt4" class="tab small" action="tier:4">-</div>
+			</div>
+			<div id="search_box" class="search">
+				<span class="ico">&#xE721;</span>
+				<input id="search" type="text" value="" size="24"/>
+				<span class="hint">Search quest steps</span>
+			</div>
+		</div>
+
+		<div id="quest_body" class="qbody">
+			<div id="q_label" class="q-label">-</div>
+			<div class="prog-block">
+				<div class="prog-line"><span id="q_prog" class="prog-txt">Tier Progress: 0/0 Steps</span></div>
+				<div class="pbar"><div id="q_fill" class="pfill gold"></div></div>
+				<div class="prog-line"><span id="q_chain" class="prog-txt blue">Overall Chain: 0/0</span></div>
+				<div class="pbar thin"><div id="c_fill" class="pfill blue"></div></div>
+			</div>
+			<div class="pager">
+				<div class="pg" action="pg:first">&#171;</div>
+				<div class="pg" action="pg:prev">&#8249;</div>
+				<span id="q_page" class="page-txt">Page 1 / 1</span>
+				<div class="pg" action="pg:next">&#8250;</div>
+				<div class="pg" action="pg:last">&#187;</div>
+				<span class="spacer"></span>
+				<span class="muted">Click a step to check / uncheck</span>
+			</div>
+			<div id="q_auto" class="auto-msg"></div>
+			<div id="steps" class="step-list"></div>
+		</div>
+
+		<div id="alt_body" class="qbody hidden">
+			<div class="section-head tight">
+				<span>Alt Currency Tracker</span>
+				<span class="spacer"></span>
+				<div class="mini-btn" action="alt:refresh">Refresh</div>
+				<div id="alt_live" class="mini-btn on" action="alt:live">Live: ON</div>
+			</div>
+			<div id="alt_search_box" class="search wide">
+				<span class="ico">&#xE721;</span>
+				<input id="altsearch" type="text" value="" size="24"/>
+				<span class="hint">Search currencies</span>
+			</div>
+			<div class="alt-head"><span class="grow">Currency</span><span>Balance</span></div>
+			<div id="alt_list" class="alt-list"></div>
+		</div>
+	</div>
+
+	<!-- info line -->
+	<div class="infoline">
+		<span class="info-lbl">Players</span>
+		<span id="if_pcs" class="pcs zero">0</span>
+		<span class="dotsep">|</span>
+		<span id="fk1" class="fk hidden">F1</span>
+		<span id="fk2" class="fk hidden">F2</span>
+		<span id="fk3" class="fk hidden">F3</span>
+		<span id="fk4" class="fk hidden">F4</span>
+		<span id="fk5" class="fk hidden">F5</span>
+		<span id="fk6" class="fk hidden">F6</span>
+		<span class="dotsep">|</span>
+		<span id="if_spawn" class="spawn-dot"></span>
+		<span id="if_spawn_txt" class="info-lbl">No spawns</span>
+	</div>
+</body>
+</rml>

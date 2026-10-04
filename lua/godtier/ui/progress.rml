@@ -1,0 +1,67 @@
+<rml>
+<head>
+	<title>God Tier</title>
+	<link type="text/template" href="../../rmlui/theme/window.rml"/>
+	<link type="text/rcss" href="godtier.rcss"/>
+</head>
+<body template="window">
+	<div class="hero">
+		<div class="hero-main">
+			<div class="eyebrow">Ultimate EQ · Illuminous</div>
+			<div class="hero-title">God Tier 71–75</div>
+			<div class="hero-sub" id="char_line">—</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico lvl">&#xE734;</div>
+			<div>
+				<div id="st_level" class="stat-num">0</div>
+				<div class="stat-lbl">Level</div>
+			</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico zone">&#xE128;</div>
+			<div>
+				<div id="st_zone" class="stat-num small">—</div>
+				<div class="stat-lbl">Zone</div>
+			</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico done">&#xE73E;</div>
+			<div>
+				<div id="st_done" class="stat-num">0/5</div>
+				<div class="stat-lbl">Steps done</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="gate_banner" class="banner warn">
+		<span class="ico">&#xE7BA;</span>
+		<span id="gate_txt">GOD_TIER_LAUNCH_ENABLED = 0 — Aftershock / Seism gated</span>
+	</div>
+	<div id="gm_banner" class="banner info">
+		<span class="ico">&#xE946;</span>
+		<span>GM: Seism still has the arena test send.</span>
+	</div>
+
+	<div class="section-head">
+		<span class="ico">&#xE8F1;</span>
+		<span>Progression items</span>
+		<span class="spacer"></span>
+		<span id="items_have" class="muted"></span>
+	</div>
+	<div id="items" class="card-grid"></div>
+
+	<div class="section-head">
+		<span class="ico">&#xE73E;</span>
+		<span>71–75 checklist</span>
+	</div>
+	<div id="steps" class="step-list"></div>
+
+	<div class="footer-note">Talk to Illuminous in guildlobby. Seism God zones stay hidden until launch is accepted.</div>
+
+	<div class="actions">
+		<div class="btn primary" action="open:talents"><span class="ico">&#xE8F1;</span> Open talents</div>
+		<div class="btn" action="quit">Quit</div>
+	</div>
+</body>
+</rml>

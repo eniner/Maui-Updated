@@ -1,0 +1,130 @@
+<rml>
+<head>
+	<title>SpawnWatch</title>
+	<link type="text/template" href="../../rmlui/theme/window.rml"/>
+	<link type="text/rcss" href="spawn.rcss"/>
+</head>
+<body template="window">
+	<div class="hero">
+		<div class="zone-card">
+			<div class="eyebrow">Current zone</div>
+			<div id="zone_name" class="zone-name">Unknown</div>
+			<div class="zone-meta">
+				<span id="zone_short" class="chip">--</span>
+				<span id="scope_chip" class="chip ghost">This zone only</span>
+			</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico up">&#xE9D9;</div>
+			<div><div id="st_up" class="stat-num">0</div><div class="stat-lbl">Spawns up</div></div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico named">&#xE735;</div>
+			<div><div id="st_named" class="stat-num">0</div><div class="stat-lbl">Named</div></div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico timers">&#xE916;</div>
+			<div><div id="st_timers" class="stat-num">0</div><div class="stat-lbl">Timers</div></div>
+		</div>
+		<div id="scan_stat" class="stat scan">
+			<div class="stat-ico scanico"><div class="spinner"></div><div class="check">&#xE73E;</div></div>
+			<div><div id="st_scan" class="stat-num small">Idle</div><div id="st_scan_sub" class="stat-lbl">Manual</div></div>
+		</div>
+	</div>
+
+	<div class="toolbar">
+		<div id="search_box" class="search">
+			<span class="ico">&#xE721;</span>
+			<input id="search" type="text" value="" size="18"/>
+			<span class="hint">Filter name, id, loc</span>
+		</div>
+		<div class="seg">
+			<div id="seg_cur" class="seg-item on" action="zones:cur">This zone</div>
+			<div id="seg_all" class="seg-item" action="zones:all">All zones</div>
+		</div>
+		<div id="tg_auto" class="toggle" action="tog:auto"><div class="sw"><div class="knob"></div></div><span>Auto</span></div>
+		<div id="tg_alerts" class="toggle" action="tog:alerts"><div class="sw"><div class="knob"></div></div><span>Alerts</span></div>
+		<div id="tg_zscan" class="toggle" action="tog:zscan"><div class="sw"><div class="knob"></div></div><span>ZScan</span></div>
+		<div class="spacer"></div>
+		<div class="tool-wrap">
+			<div id="btn_cols" class="text-btn" action="panel:cols" title="Show / hide columns">Cols</div>
+			<div id="panel_cols" class="popover">
+				<div class="pop-title">Visible columns</div>
+				<div id="chk_name" class="chk on locked" action="col:name"><span class="box">&#xE73E;</span> Spawn / Name</div>
+				<div id="chk_level" class="chk on" action="col:level"><span class="box">&#xE73E;</span> Level</div>
+				<div id="chk_hp" class="chk on" action="col:hp"><span class="box">&#xE73E;</span> Health</div>
+				<div id="chk_dist" class="chk on" action="col:dist"><span class="box">&#xE73E;</span> Distance</div>
+				<div id="chk_timer" class="chk on" action="col:timer"><span class="box">&#xE73E;</span> Timer</div>
+				<div id="chk_loc" class="chk on" action="col:loc"><span class="box">&#xE73E;</span> Location</div>
+				<div id="chk_zone" class="chk on" action="col:zone"><span class="box">&#xE73E;</span> Zone</div>
+				<div id="chk_actions" class="chk on" action="col:actions"><span class="box">&#xE73E;</span> Actions</div>
+				<div class="pop-sep"></div>
+				<div class="mi" action="cols:all">Show all</div>
+				<div class="mi" action="cols:compact">Compact (name, hp, dist, actions)</div>
+			</div>
+		</div>
+		<div class="tool-wrap">
+			<div id="btn_size" class="text-btn" action="panel:size" title="Resize window">Size</div>
+			<div id="panel_size" class="popover">
+				<div id="size_cur" class="pop-title">Current: 1180 x 600</div>
+				<div class="mi" action="size:900x480">Compact  900 x 480</div>
+				<div class="mi" action="size:1180x600">Standard 1180 x 600</div>
+				<div class="mi" action="size:1400x700">Wide     1400 x 700</div>
+				<div class="mi" action="size:1100x860">Tall     1100 x 860</div>
+				<div class="mi" action="size:1500x900">Large    1500 x 900</div>
+				<div class="pop-sep"></div>
+				<div class="size-row">
+					<span>W</span><input id="size_w" type="text" value="1180" size="5"/>
+					<span>H</span><input id="size_h" type="text" value="600" size="5"/>
+				</div>
+				<div class="btn primary size-apply" action="size:apply">Apply size</div>
+			</div>
+		</div>
+		<div class="icon-btn" action="open:edit" title="Watchlist editor">&#xE70F;</div>
+		<div class="icon-btn" action="open:log" title="Event log">&#xE823;</div>
+		<div class="icon-btn" action="open:nearby" title="Nearby">&#xE707;</div>
+		<div id="btn_scan" class="btn primary scan-btn" action="refresh"><span class="ico">&#xE72C;</span> Scan</div>
+	</div>
+
+	<div class="subbar">
+		<div id="status" class="status"><span id="status_dot" class="dot"></span><span id="status_txt">Ready</span></div>
+		<div class="spacer"></div>
+		<div class="radius">
+			<span class="ico">&#xE81D;</span>
+			<span class="radius-lbl">Camp radius</span>
+			<input id="radius" type="range" min="0" max="1500" step="25" value="0"/>
+			<span id="radius_val" class="radius-val">off</span>
+			<div id="btn_camp" class="mini-btn" action="camp" title="Lock camp center to your position">Set camp</div>
+		</div>
+	</div>
+
+	<div id="table" class="table">
+		<div class="thead">
+			<div id="th_name" class="th c-name" action="sort:name"><span>Name</span><span id="ar_name" class="arrow"></span></div>
+			<div id="th_level" class="th c-lvl" action="sort:level">Lvl<span id="ar_level" class="arrow"></span></div>
+			<div id="th_hp" class="th c-hp" action="sort:hp">Health<span id="ar_hp" class="arrow"></span></div>
+			<div id="th_dist" class="th c-dist" action="sort:dist">Distance<span id="ar_dist" class="arrow"></span></div>
+			<div id="th_timer" class="th c-timer" action="sort:timer">Respawn<span id="ar_timer" class="arrow"></span></div>
+			<div class="th c-loc">Location</div>
+			<div class="th c-zone">Zone</div>
+			<div class="th c-act">Actions</div>
+		</div>
+		<div id="rows" class="tbody"></div>
+		<div class="empty">
+			<div class="empty-ico">&#xE721;</div>
+			<div class="empty-title">Nothing tracked here yet</div>
+			<div class="empty-sub">Add queries in the watchlist editor, or scan every targetable NPC in the zone.</div>
+			<div class="empty-actions">
+				<div class="btn primary" action="refresh">Scan zone</div>
+				<div class="btn" action="open:edit">Open watchlist</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="footer">
+		<span id="ft_left"></span>
+		<span class="spacer"></span>
+		<span id="ft_right"></span>
+	</div>
+</body>
+</rml>

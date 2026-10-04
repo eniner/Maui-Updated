@@ -1,0 +1,43 @@
+<rml>
+<head>
+	<title>Ultimate EQ Launcher</title>
+	<link type="text/template" href="../../rmlui/theme/window.rml"/>
+	<link type="text/rcss" href="launcher.rcss"/>
+</head>
+<body template="window">
+	<div class="hero">
+		<div class="hero-main">
+			<div class="eyebrow">Ultimate EQ</div>
+			<div class="hero-title">Launcher</div>
+			<div id="hero_sub" class="hero-sub">Click a tool to toggle it on or off</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico run">&#xE768;</div>
+			<div>
+				<div id="st_run" class="stat-num">0</div>
+				<div class="stat-lbl">Running</div>
+			</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico tools">&#xE90F;</div>
+			<div>
+				<div id="st_tools" class="stat-num">0</div>
+				<div class="stat-lbl">Tools</div>
+			</div>
+		</div>
+	</div>
+
+	<div id="arm_banner" class="banner warn">
+		<span class="ico">&#xE7BA;</span>
+		<span id="arm_txt">Launcher arming…</span>
+	</div>
+
+	<div id="cats" class="cats"></div>
+
+	<div class="footer">
+		<div class="btn danger" action="quit">Quit launcher</div>
+		<span class="spacer"></span>
+		<span id="ft_hint" class="muted">/ueqlauncher toggles · /ueqlaunchquit stops</span>
+	</div>
+</body>
+</rml>

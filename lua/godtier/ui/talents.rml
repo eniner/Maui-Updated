@@ -1,0 +1,50 @@
+<rml>
+<head>
+	<title>God Talents</title>
+	<link type="text/template" href="../../rmlui/theme/window.rml"/>
+	<link type="text/rcss" href="godtier.rcss"/>
+</head>
+<body template="window">
+	<div class="hero compact">
+		<div class="hero-main">
+			<div class="eyebrow">Crumble · post-75</div>
+			<div class="hero-title" id="tal_title">God Talents</div>
+			<div class="hero-sub" id="tal_sub">—</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico lvl">&#xE8F1;</div>
+			<div>
+				<div id="tal_count" class="stat-num">0</div>
+				<div class="stat-lbl">In catalog</div>
+			</div>
+		</div>
+		<div class="stat">
+			<div class="stat-ico done">&#xE721;</div>
+			<div>
+				<div id="tal_shown" class="stat-num">0</div>
+				<div class="stat-lbl">Shown</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="toolbar">
+		<div id="search_box" class="search">
+			<span class="ico">&#xE721;</span>
+			<input id="search" type="text" value="" size="22"/>
+			<span class="hint">Filter name or description</span>
+		</div>
+		<div class="spacer"></div>
+		<div class="btn" action="refresh"><span class="ico">&#xE72C;</span> Refresh</div>
+		<div class="btn" action="open:progress">Progression</div>
+	</div>
+
+	<div class="split">
+		<div id="tal_list" class="tal-list"></div>
+		<div id="tal_detail" class="tal-detail empty-detail">
+			<div class="empty-ico">&#xE8F1;</div>
+			<div class="empty-title">Select a talent</div>
+			<div class="empty-sub">Pick one from the list to see cost, ranks, and description.</div>
+		</div>
+	</div>
+</body>
+</rml>

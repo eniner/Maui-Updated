@@ -1,0 +1,77 @@
+<rml>
+<head>
+	<title>GM Console</title>
+	<link type="text/template" href="../../rmlui/theme/window.rml"/>
+	<link type="text/rcss" href="console.rcss"/>
+</head>
+<body template="window">
+	<div class="statusbar">
+		<span class="live-dot"></span>
+		<span id="st_player" class="player">Player</span>
+		<span class="sep">|</span>
+		<span id="st_zone" class="zone">Zone</span>
+		<span class="spacer"></span>
+		<span id="st_badge" class="badge">GM</span>
+		<span id="st_count" class="muted"></span>
+	</div>
+
+	<div class="body">
+		<div class="sidebar">
+			<div class="side-head">Sections</div>
+			<div id="nav" class="nav"></div>
+		</div>
+		<div class="main">
+			<div class="main-head">
+				<div id="sec_accent" class="accent"></div>
+				<div id="sec_title" class="sec-title">Commands</div>
+				<span class="spacer"></span>
+				<span id="sec_meta" class="muted"></span>
+			</div>
+			<div id="cmd_grid" class="cmd-grid"></div>
+			<div id="cmd_empty" class="empty">No commands match this filter.</div>
+		</div>
+	</div>
+
+	<div class="dock">
+		<div class="dock-row">
+			<div class="field grow">
+				<div class="field-lbl">Param</div>
+				<input id="param" type="text" value="" size="24"/>
+			</div>
+			<div class="field grow">
+				<div class="field-lbl">Filter</div>
+				<input id="filter" type="text" value="" size="24"/>
+			</div>
+		</div>
+		<div class="dock-row">
+			<div class="field grow">
+				<div class="field-lbl">Raw command</div>
+				<input id="raw" type="text" value="" size="40"/>
+			</div>
+			<div id="btn_run" class="btn primary" action="raw:run">Run</div>
+			<div class="btn" action="raw:clear">Clear</div>
+		</div>
+		<div class="dock-foot">
+			<span class="muted">Last sent:</span>
+			<span id="last_sent" class="last">none</span>
+			<span class="spacer"></span>
+			<span class="hint">Dangerous actions ask for confirmation. Param fills &lt;param&gt; tokens.</span>
+		</div>
+	</div>
+
+	<div id="confirm" class="modal">
+		<div class="modal-card">
+			<div class="modal-title"><span class="ico">&#xE7BA;</span> Critical command</div>
+			<div id="confirm_cmd" class="modal-cmd">#</div>
+			<div id="confirm_param_wrap" class="field">
+				<div class="field-lbl">Parameter</div>
+				<input id="confirm_param" type="text" value="" size="28"/>
+			</div>
+			<div class="modal-actions">
+				<div class="btn danger" action="confirm:yes">Execute</div>
+				<div class="btn" action="confirm:no">Cancel</div>
+			</div>
+		</div>
+	</div>
+</body>
+</rml>

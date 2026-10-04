@@ -1,21 +1,49 @@
---Version 1.2.0
-local mq = require 'mq'
-require 'ImGui'
-local themeBridge = require 'lib.maui_theme_bridge'
-local ueqFloat = require('ueq_logo_float')
-local Open,ShowUI = true,true
+--[[ ProEQ / ProFusion quest tracker (RmlUi) — /lua run UltimateEQ  or  /lua run proeq ]]
 
--- icons for the checkboxes
-local done = mq.FindTextureAnimation('A_TransparentCheckBoxPressed')
-local notDone = mq.FindTextureAnimation('A_TransparentCheckBoxNormal')
+local mq = require('mq')
+local rmlui = require('rmlui')
 
--- Some WindowFlags (allow manual resize so users can recover from bad persisted sizes)
-local WindowFlags = ImGuiWindowFlags.NoTitleBar
+local SCRIPT_DIR = (debug.getinfo(1, 'S').source:gsub('^@', ''):match('^(.*[\\/])')) or ''
+local DATA_DIR = _G.UEQ_DATA_DIR or SCRIPT_DIR
+
+local function dataFile(name)
+    return DATA_DIR .. name
+end
+
+local function dataLoad(name)
+    local ok, result = pcall(dofile, dataFile(name))
+    if ok and type(result) == 'table' then
+        return result
+    end
+    error('[ProEQ] missing ' .. dataFile(name))
+end
+
+local ueqFloat = nil
+pcall(function() ueqFloat = require('ueq_logo_float') end)
+local Open, ShowUI = true, true
+
+local WIN_NAME = 'ProEQHud'
+local win = nil
+local nextHudUpdate = 0
+local questViewAlt = false
+local huntRowSlots = -1
+local stepRowSlots = -1
+local altRowSlots = -1
+local visibleStepsCache = {}
+
+local function esc(s)
+    s = tostring(s or '')
+    s = s:gsub('&', '&amp;'):gsub('<', '&lt;'):gsub('>', '&gt;'):gsub('"', '&quot;')
+    return s
+end
 
 -- forward declarations used by quest mini helpers
 local oldZone, myZone, showOnlyMissing, minimize, showGrind, onlySpawned, spawnUp, totalDone
 local showQuestMini, questOnlyMissing, questTierIndex
 local questAutoTrack, questAutoLastMsg
+--- Quest Mini: `questMiniHideNav` — hide tier tabs + search (progress/chain/list only). `questMiniClearBg` — see-through HUD window.
+local questMiniClearBg
+local questMiniHideNav
 local questTrackerFile, questTierOrder, questData, questTracker
 local questSearchText, questPage, questStepsPerPage
 local toggleCommand, activeToggleCommand
@@ -28,62 +56,17 @@ local altCurrencyLiveRead = true
 local altCurrencyLastRefresh = 0
 
 local altCurrencyList = {
-    { name = 'Tier 1 Credits',  variants = { 'Tier 1 Credits',  'Tier 1 Credit'  } },
-    { name = 'Tier 2 Credits',  variants = { 'Tier 2 Credits',  'Tier 2 Credit'  } },
-    { name = 'Tier 3 Credits',  variants = { 'Tier 3 Credits',  'Tier 3 Credit'  } },
-    { name = 'Tier 4 Credits',  variants = { 'Tier 4 Credits',  'Tier 4 Credit'  } },
-    { name = 'Tier 5 Credits',  variants = { 'Tier 5 Credits',  'Tier 5 Credit'  } },
-    { name = 'Tier 6 Credits',  variants = { 'Tier 6 Credits',  'Tier 6 Credit'  } },
-    { name = 'Tier 7 Credits',  variants = { 'Tier 7 Credits',  'Tier 7 Credit'  } },
-    { name = 'Tier 8 Credits',  variants = { 'Tier 8 Credits',  'Tier 8 Credit'  } },
-    { name = 'Tier 9 Credits',  variants = { 'Tier 9 Credits',  'Tier 9 Credit'  } },
-    { name = 'Tier 10 Credits', variants = { 'Tier 10 Credits', 'Tier 10 Credit' } },
+    { name = 'Timekeeper Credits',      variants = { 'Timekeeper Credits',      'Timekeeper Credit'      } },
+    { name = 'Najena Kill Points',      variants = { 'Najena Kill Points',      'Najena Kill Point'      } },
+    { name = 'Riftseekers Kill Points', variants = { 'Riftseekers Kill Points', 'Riftseekers Kill Point'  } },
+    { name = 'ProFusion Credits',       variants = { 'ProFusion Credits',       'ProFusion Credit'       } },
+    { name = 'Season Credits',          variants = { 'Season Credits',          'Season Credit', 'Season Points' } },
+    { name = 'Contributor Credits',     variants = { 'Contributor Credits',     'Contributor Credit'     } },
+    { name = 'AA Points',               variants = { 'AA Points',               'Alternate Advancement Points' } },
 }
 
--- print format function
 local function printf(...)
     print(string.format(...))
-end
-
-local function push_spawnmaster_theme()
-    local pv, pc = 0, 0
-    local function sv(var, ...)
-        ImGui.PushStyleVar(var, ...)
-        pv = pv + 1
-    end
-    local function sc(col, ...)
-        ImGui.PushStyleColor(col, ...)
-        pc = pc + 1
-    end
-
-    sv(ImGuiStyleVar.WindowRounding, 4)
-    sv(ImGuiStyleVar.FrameRounding, 5)
-    sv(ImGuiStyleVar.FrameBorderSize, 1)
-    sv(ImGuiStyleVar.WindowPadding, 8, 6)
-    sv(ImGuiStyleVar.ItemSpacing, 6, 4)
-
-    sc(ImGuiCol.WindowBg, 0.04, 0.02, 0.08, 0.95)
-    sc(ImGuiCol.TitleBg, 0.14, 0.02, 0.22, 1.00)
-    sc(ImGuiCol.TitleBgActive, 0.24, 0.04, 0.32, 1.00)
-    sc(ImGuiCol.Button, 0.18, 0.06, 0.26, 1.00)
-    sc(ImGuiCol.ButtonHovered, 0.36, 0.09, 0.44, 1.00)
-    sc(ImGuiCol.ButtonActive, 0.50, 0.12, 0.58, 1.00)
-    sc(ImGuiCol.FrameBg, 0.10, 0.04, 0.16, 1.00)
-    sc(ImGuiCol.FrameBgHovered, 0.18, 0.07, 0.26, 1.00)
-    sc(ImGuiCol.FrameBgActive, 0.26, 0.10, 0.36, 1.00)
-    sc(ImGuiCol.Header, 0.22, 0.07, 0.30, 1.00)
-    sc(ImGuiCol.HeaderHovered, 0.34, 0.10, 0.42, 1.00)
-    sc(ImGuiCol.HeaderActive, 0.44, 0.13, 0.52, 1.00)
-    sc(ImGuiCol.Border, 0.90, 0.16, 0.68, 0.70)
-    sc(ImGuiCol.Separator, 0.22, 0.90, 0.84, 0.60)
-    sc(ImGuiCol.Text, 0.92, 0.96, 1.00, 1.00)
-
-    return pv, pc
-end
-
-local function pop_spawnmaster_theme(pv, pc)
-    if pc and pc > 0 then ImGui.PopStyleColor(pc) end
-    if pv and pv > 0 then ImGui.PopStyleVar(pv) end
 end
 
 local function saveQuestTracker()
@@ -95,6 +78,8 @@ local function saveQuestTracker()
     f:write(('  showQuestMini = %s,\n'):format(showQuestMini and 'true' or 'false'))
     f:write(('  questOnlyMissing = %s,\n'):format(questOnlyMissing and 'true' or 'false'))
     f:write(('  questAutoTrack = %s,\n'):format(questAutoTrack and 'true' or 'false'))
+    f:write(('  questMiniClearBg = %s,\n'):format(questMiniClearBg and 'true' or 'false'))
+    f:write(('  questMiniHideNav = %s,\n'):format(questMiniHideNav and 'true' or 'false'))
     f:write('  tiers = {\n')
     for _, tierId in ipairs(questTierOrder) do
         local entries = questTracker.tiers[tierId] or {}
@@ -126,6 +111,12 @@ local function loadQuestTracker()
     end
     if type(loaded.questAutoTrack) == 'boolean' then
         questAutoTrack = loaded.questAutoTrack
+    end
+    if type(loaded.questMiniClearBg) == 'boolean' then
+        questMiniClearBg = loaded.questMiniClearBg
+    end
+    if type(loaded.questMiniHideNav) == 'boolean' then
+        questMiniHideNav = loaded.questMiniHideNav
     end
     if type(loaded.tiers) == 'table' then
         for _, tierId in ipairs(questTierOrder) do
@@ -191,78 +182,6 @@ local function refreshAltCurrencyFromGame()
         end
     end
     saveAltCurrency()
-end
-
-local function renderAltCurrency()
-    -- Throttled live read once per second
-    if altCurrencyLiveRead then
-        local now = os.time()
-        if now ~= altCurrencyLastRefresh then
-            altCurrencyLastRefresh = now
-            refreshAltCurrencyFromGame()
-        end
-    end
-
-    ImGui.Separator()
-    ImGui.TextColored(0.973, 0.741, 0.129, 1, 'Alt Currency Tracker')
-    ImGui.Spacing()
-
-    -- Search bar
-    local newSearch, changed = ImGui.InputText('Search##altcur_search', altCurrencySearch, 128)
-    if changed then altCurrencySearch = newSearch end
-
-    ImGui.Spacing()
-
-    -- Controls row
-    if ImGui.SmallButton('Refresh##altcur_refresh') then
-        refreshAltCurrencyFromGame()
-    end
-    ImGui.SameLine()
-    local liveLabel = altCurrencyLiveRead and 'Live: ON##altcur_live' or 'Live: OFF##altcur_live'
-    if ImGui.SmallButton(liveLabel) then
-        altCurrencyLiveRead = not altCurrencyLiveRead
-    end
-
-    ImGui.Separator()
-
-    -- Header row
-    local totalW = ImGui.GetContentRegionAvail()
-    ImGui.PushStyleColor(ImGuiCol.Text, 0.22, 0.90, 0.84, 1.00)
-    ImGui.Text('Currency')
-    ImGui.SameLine(totalW - 90)
-    ImGui.Text('Balance')
-    ImGui.PopStyleColor()
-    ImGui.Separator()
-
-    -- Scrollable list
-    local _, availY = ImGui.GetContentRegionAvail()
-    ImGui.BeginChild('##altcur_child', totalW, availY, true)
-
-    local childW = ImGui.GetContentRegionAvail()
-    local searchNorm = (altCurrencySearch or ''):lower()
-    local rowIndex = 0
-
-    for _, cur in ipairs(altCurrencyList) do
-        if searchNorm == '' or cur.name:lower():find(searchNorm, 1, true) then
-            rowIndex = rowIndex + 1
-            local val = altCurrencyData[cur.name] or 0
-            local valStr = tostring(val)
-
-            -- Alternating name color
-            if rowIndex % 2 == 0 then
-                ImGui.TextColored(0.92, 0.96, 1.00, 1.00, cur.name)
-            else
-                ImGui.TextColored(0.690, 0.553, 0.259, 1.00, cur.name)
-            end
-
-            -- Right-align the balance value
-            local valW = ImGui.CalcTextSize(valStr)
-            ImGui.SameLine(childW - valW - 6)
-            ImGui.TextColored(0.22, 0.90, 0.84, 1.00, valStr)
-        end
-    end
-
-    ImGui.EndChild()
 end
 
 local function questStepKey(tierId, idx)
@@ -334,7 +253,7 @@ local function actionMatchesQuestStep(action, stepNorm, tokenNorm)
         return stepNorm:match('^collect ') or stepNorm:match('^loot ') or stepNorm:match('^obtain ')
     end
     if action == 'turnin' then
-        return stepNorm:match('^turn in ') or stepNorm:match('^deliver ')
+        return stepNorm:match('^turn in ') or stepNorm:match('^deliver ') or stepNorm:match('^give ')
     end
     if action == 'hail' then
         return stepNorm:match('^hail ')
@@ -390,31 +309,29 @@ end
 local function detectQuestTierFromCompletion(text)
     local t = (text or ''):lower()
     local map = {
-        ['vanilla progression'] = '11.1',
-        ['kunark progression'] = '11.1',
-        ['velious progression'] = '11.1',
-        ['luclin progression'] = '11.1',
-        ['pop progression'] = '11.1',
-        ['crushbone'] = '11.2',
-        ['sebilis'] = '11.3',
-        ['temple of veeshan'] = '11.4',
-        ['kael drakkel'] = '11.5',
-        ['sleeper'] = '11.6',
-        ['blackburrow'] = '11.7',
-        ['mistmoore'] = '11.7',
-        ['solusek a'] = '11.7',
-        ['the hole'] = '11.8',
-        ['frozen shadow'] = '11.9',
-        ['veeshan peak'] = '11.10',
-        ['ocean of tears'] = '11.11',
-        ['unrest'] = '11.11',
-        ['plane of fear'] = '11.12',
-        ['velketor'] = '11.13',
-        ['goblin vault'] = '11.14',
-        ['elddar forest'] = '11.15',
-        ['old kurn'] = '11.15',
-        ['crystallos'] = '11.15',
-        ['god tier'] = '11.15',
+        ['temple of veeshan'] = '11.1',
+        ['tov'] = '11.1',
+        ['riftseekers'] = '11.2',
+        ['najena'] = '11.3',
+        ['hidden najena'] = '11.3',
+        ['the hole'] = '11.4',
+        ['muramite proving'] = '11.5',
+        ['proving grounds'] = '11.5',
+        ['kael'] = '11.6',
+        ['anguish'] = '11.7',
+        ['sleeper'] = '11.8',
+        ['sleepers'] = '11.8',
+        ['xorbb'] = '11.9',
+        ['valley of king xorbb'] = '11.9',
+        ['devastation'] = '11.10',
+        ['plane of time'] = '11.11',
+        ['shards landing'] = '11.12',
+        ['beast domain'] = '11.13',
+        ['plane of hate'] = '11.14',
+        ['hate'] = '11.14',
+        ['frozen shadow'] = '11.15',
+        ['tower of frozen shadow'] = '11.15',
+        ['tofs'] = '11.15',
     }
     for key, tierId in pairs(map) do
         if t:find(key, 1, true) then
@@ -435,159 +352,6 @@ local function autoTrackQuestCompletion(text)
     return false
 end
 
-local function renderQuestMini()
-    if not showQuestMini then return end
-    local tierId = questTierOrder[questTierIndex]
-    local data = questData[tierId]
-    if not data then return end
-
-    ImGui.Separator()
-    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize('Quest Mini')) * 0.5)
-    ImGui.TextColored(0.973, 0.741, 0.129, 1, 'Quest Mini')
-    local groupTabs = {
-        { label = 'Pre', ids = { '11.1' } },
-        { label = 'Ultimate', ids = { '11.2', '11.3', '11.4', '11.5', '11.6' } },
-        { label = 'Avatar', ids = { '11.7', '11.8', '11.9', '11.10' } },
-        { label = 'Demigod', ids = { '11.11', '11.12', '11.13', '11.14' } },
-        { label = 'God', ids = { '11.15' } },
-    }
-
-    local function setTierById(gid)
-        for i, id in ipairs(questTierOrder) do
-            if id == gid then
-                questTierIndex = i
-                tierId = gid
-                data = questData[tierId]
-                questPage = 1
-                saveQuestTracker()
-                return
-            end
-        end
-    end
-
-    local function currentTierInGroup(group)
-        for _, gid in ipairs(group.ids) do
-            if gid == tierId then return true end
-        end
-        return false
-    end
-
-    if ImGui.BeginTabBar('##quest_group_tabs') then
-        for _, group in ipairs(groupTabs) do
-            if ImGui.BeginTabItem(group.label) then
-                if not currentTierInGroup(group) then
-                    setTierById(group.ids[1])
-                end
-                if ImGui.BeginTabBar('##quest_tier_tabs_' .. group.label) then
-                    for _, gid in ipairs(group.ids) do
-                        local label = questData[gid] and questData[gid].label or gid
-                        local openTier = (gid == tierId)
-                        if ImGui.BeginTabItem(label .. '##tier_tab_' .. gid) then
-                            if not openTier then setTierById(gid) end
-                            ImGui.EndTabItem()
-                        end
-                    end
-                    ImGui.EndTabBar()
-                end
-                ImGui.EndTabItem()
-            end
-        end
-
-        -- Alt Currency tab
-        if ImGui.BeginTabItem('Alt Cur##altcur_tab') then
-            ImGui.EndTabItem()
-            ImGui.EndTabBar()
-            renderAltCurrency()
-            return
-        end
-
-        ImGui.EndTabBar()
-    end
-
-    ImGui.TextColored(0.690, 0.553, 0.259, 1, data.label)
-    local newSearch, changed = ImGui.InputText('Search##quest_search', questSearchText, 128)
-    if changed then
-        questSearchText = newSearch
-        questPage = 1
-    end
-
-    local doneCount, totalCount = getQuestCounts(tierId)
-    local pct = 0
-    if totalCount > 0 then pct = doneCount / totalCount end
-    local availW = ImGui.GetContentRegionAvail()
-    local barW = availW - 2
-    if barW < 120 then barW = 120 end
-    ImGui.TextColored(0.92, 0.96, 1.00, 1.00, string.format('Tier Progress: %d/%d Steps', doneCount, totalCount))
-    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, 0.690, 0.553, 0.259, 0.5)
-    ImGui.PushStyleColor(ImGuiCol.FrameBg, 0.33, 0.33, 0.33, 0.5)
-    ImGui.ProgressBar(pct, barW, 18, '')
-    ImGui.PopStyleColor(2)
-
-    local overallDone, overallTotal = getOverallQuestCounts()
-    local overallPct = 0
-    if overallTotal > 0 then overallPct = overallDone / overallTotal end
-    ImGui.TextColored(0.22, 0.90, 0.84, 1.00, string.format('Overall Chain: %d/%d', overallDone, overallTotal))
-    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, 0.22, 0.90, 0.84, 0.70)
-    ImGui.PushStyleColor(ImGuiCol.FrameBg, 0.20, 0.08, 0.28, 0.65)
-    ImGui.ProgressBar(overallPct, barW, 14, '')
-    ImGui.PopStyleColor(2)
-
-    local visible = {}
-    local searchNorm = normalizeQuestText(questSearchText or '')
-    for idx, step in ipairs(data.steps) do
-        local key = questStepKey(tierId, idx)
-        local checked = isQuestStepDone(tierId, key)
-        local includeMissing = (not questOnlyMissing) or (not checked)
-        local includeSearch = (searchNorm == '') or (normalizeQuestText(step):find(searchNorm, 1, true) ~= nil)
-        if includeMissing and includeSearch then
-            table.insert(visible, { idx = idx, key = key, step = step, checked = checked })
-        end
-    end
-
-    local totalPages = math.max(1, math.ceil(#visible / questStepsPerPage))
-    if questPage > totalPages then questPage = totalPages end
-    if questPage < 1 then questPage = 1 end
-
-    if ImGui.SmallButton('<<##qfirst') then questPage = 1 end
-    ImGui.SameLine()
-    if ImGui.SmallButton('<##qprevpage') then questPage = math.max(1, questPage - 1) end
-    ImGui.SameLine()
-    ImGui.TextColored(0.65, 0.65, 0.65, 1, string.format('Page %d / %d', questPage, totalPages))
-    ImGui.SameLine()
-    if ImGui.SmallButton('>##qnextpage') then questPage = math.min(totalPages, questPage + 1) end
-    ImGui.SameLine()
-    if ImGui.SmallButton('>>##qlast') then questPage = totalPages end
-
-    if questAutoLastMsg ~= '' then
-        ImGui.TextColored(0.65, 0.65, 0.65, 1, questAutoLastMsg)
-    end
-    ImGui.TextColored(0.60, 0.90, 0.90, 1, 'Manual override: click any step to check/uncheck.')
-
-    if minimize then return end
-    local startIdx = ((questPage - 1) * questStepsPerPage) + 1
-    local endIdx = math.min(#visible, startIdx + questStepsPerPage - 1)
-
-    local availX, availY = ImGui.GetContentRegionAvail()
-    ImGui.BeginChild('##quest_step_child', availX, availY, true)
-    for i = startIdx, endIdx do
-        local row = visible[i]
-        if row then
-            local boxLabel = (row.checked and '[x]' or '[ ]') .. '##questbox' .. row.key
-            if ImGui.SmallButton(boxLabel) then
-                setQuestStepDone(tierId, row.key, not row.checked)
-                row.checked = not row.checked
-            end
-            ImGui.SameLine()
-            local clicked = ImGui.Selectable(row.step .. '##quest' .. row.key, false)
-            if clicked then
-                setQuestStepDone(tierId, row.key, not row.checked)
-                row.checked = not row.checked
-            end
-        end
-    end
-    ImGui.EndChild()
-end
-
 oldZone = 0
 myZone = mq.TLO.Zone.ID
 showOnlyMissing = false
@@ -604,6 +368,8 @@ questAutoLastMsg = ''
 questSearchText = ''
 questPage = 1
 questStepsPerPage = 8
+questMiniClearBg = false
+questMiniHideNav = false
 toggleCommand = '/hhtoggle'
 activeToggleCommand = nil
 
@@ -616,15 +382,8 @@ local myHunterSpawn = {}
 -- Current Achievemment information
 local curAch = {}
 
-questTrackerFile = 'ultimateeq_hud_quest_tracker.lua'
-altCurrencyFile  = 'ultimateeq_hud_altcurrency.lua'
-do
-    local mqRoot = mq.TLO and mq.TLO.MacroQuest and mq.TLO.MacroQuest.Path and mq.TLO.MacroQuest.Path()
-    if mqRoot and mqRoot ~= '' then
-        questTrackerFile = mqRoot .. '\\lua\\UltimateEQ Hud\\ultimateeq_hud_quest_tracker.lua'
-        altCurrencyFile  = mqRoot .. '\\lua\\UltimateEQ Hud\\ultimateeq_hud_altcurrency.lua'
-    end
-end
+questTrackerFile = dataFile('proeq_hud_quest_tracker.lua')
+altCurrencyFile  = dataFile('proeq_hud_altcurrency.lua')
 
 questTierOrder = {
     '11.1', '11.2', '11.3', '11.4', '11.5',
@@ -632,166 +391,7 @@ questTierOrder = {
     '11.11', '11.12', '11.13', '11.14', '11.15',
 }
 
-questData = {
-    ['11.1'] = {
-        label = '11.1 Pre-Ultimate',
-        steps = {
-            'Collect Nagafen\'s Head.',
-            'Collect Innoruuk\'s Brain.',
-            'Collect Cazic Thule\'s Eye.',
-            'Turn in those items plus Ultimate Charm to Mel.',
-            'Collect Trakanon\'s Tail.',
-            'Collect Phara Dar\'s Tooth.',
-            'Collect Venril Sathir\'s Belt.',
-            'Turn in those items plus Ultimate Charm - Tier 1 to Mel.',
-            'Collect The Statue\'s Helmet.',
-            'Collect Tunare\'s Torn Dress.',
-            'Collect Vulak\'s Scale.',
-            'Turn in those items plus Ultimate Charm - Tier 2 to Mel.',
-            'Collect Emperor Ssra\'s Idol.',
-            'Collect Aten\'s Ring.',
-            'Collect Grieg\'s Torn Parchment.',
-            'Turn in those items plus Ultimate Charm - Tier 3 to Mel.',
-            'Collect Rallos Zek\'s Axe.',
-            'Collect Solusek\'s Burning Staff.',
-            'Collect Fenin Ro\'s Burning Boots.',
-            'Turn in those items plus Ultimate Charm - Tier 4 to Mel.',
-        },
-    },
-    ['11.2'] = {
-        label = '11.2 Ultimate Rank 1',
-        steps = {
-            'Defeat Dvinn the Tormentor.',
-            'Defeat Ser Darish the Black.',
-            'Defeat Crush the Transformed and loot Heart of Crush the Transformed.',
-            'Deliver Heart of Crush the Transformed to Forge.',
-            'Hail Quake for Ultimate Rank 1 access.',
-        },
-    },
-    ['11.3'] = {
-        label = '11.3 Ultimate Rank 2',
-        steps = {
-            'Collect Ghoul Lord\'s Head.',
-            'Collect Froglok King\'s Head.',
-            'Collect Shin Lord\'s Head.',
-            'Collect Ancient Croc\'s Head.',
-            'Turn in all four heads to Mel at once.',
-        },
-    },
-    ['11.4'] = {
-        label = '11.4 Ultimate Rank 3',
-        steps = {
-            'Collect Ultimate weapon materials.',
-            'Craft your Ultimate Legendary weapon with Forge.',
-            'Hail Quake to access Temple of Veeshan.',
-        },
-    },
-    ['11.5'] = {
-        label = '11.5 Ultimate Rank 4',
-        steps = {
-            'Collect Ultimate Vulak\'s Scale.',
-            'Turn in Ultimate Vulak\'s Scale to Mel.',
-            'Hail Quake for Kael Drakkel access.',
-        },
-    },
-    ['11.6'] = {
-        label = '11.6 Ultimate Rank 5',
-        steps = {
-            'Collect Ultimate Kael Completion Pass.',
-            'Turn in Ultimate Kael Completion Pass to Mel.',
-            'Hail Quake for Sleeper\'s Tomb access.',
-        },
-    },
-    ['11.7'] = {
-        label = '11.7 Avatar Rank 1',
-        steps = {
-            'Collect Ultimate Kerafyrm\'s Scale.',
-            'Turn in Ultimate Kerafyrm\'s Scale to Mel.',
-            'Collect Ultimate Charm Upgrade Token (Rank 6).',
-            'Turn in Rank 6 token to Arch Magus Phil.',
-            'Hail Quake for Blackburrow, Mistmoore, and Solusek A.',
-        },
-    },
-    ['11.8'] = {
-        label = '11.8 Avatar Rank 2',
-        steps = {
-            'Collect Mayong\'s Head.',
-            'Collect Fippy\'s Head.',
-            'Collect Goblin King\'s Head.',
-            'Turn in all three heads to Mel.',
-        },
-    },
-    ['11.9'] = {
-        label = '11.9 Avatar Rank 3',
-        steps = {
-            'Collect An Earthen Soulstone.',
-            'Turn in An Earthen Soulstone to Mel.',
-            'Complete Rank 7 charm path with Measel.',
-            'Hail Quake for Tower of Frozen Shadow access.',
-        },
-    },
-    ['11.10'] = {
-        label = '11.10 Avatar Rank 4',
-        steps = {
-            'Collect Frozen Avatar Energy.',
-            'Turn in Frozen Avatar Energy to Mel.',
-            'Hail Quake for Veeshan\'s Peak access.',
-        },
-    },
-    ['11.11'] = {
-        label = '11.11 Demigod Rank 1',
-        steps = {
-            'Collect Heart of the Peak.',
-            'Turn in Heart of the Peak to Mel.',
-            'Complete Rank 8 charm path with Measel.',
-            'Hail Seism for Ocean of Tears and Unrest access.',
-        },
-    },
-    ['11.12'] = {
-        label = '11.12 Demigod Rank 2',
-        steps = {
-            'Collect Coalesced Demigod Energy.',
-            'Turn in Coalesced Demigod Energy to Mel.',
-            'Collect Ultimate Unrest Commendation.',
-            'Turn in Ultimate Unrest Commendation to Mel.',
-            'Complete Ultimate 2.0 with Cloud.',
-            'Complete Rank 9 charm path with Arch Magus Phil.',
-            'Create Plane of Fear instance with Seism.',
-        },
-    },
-    ['11.13'] = {
-        label = '11.13 Demigod Rank 3',
-        steps = {
-            'Collect A Freshly Severed Head.',
-            'Turn in A Freshly Severed Head to Mel.',
-            'Hail Seism for Velketor\'s Labyrinth access.',
-        },
-    },
-    ['11.14'] = {
-        label = '11.14 Demigod Rank 4',
-        steps = {
-            'Collect Velketorian Essence.',
-            'Turn in Velketorian Essence to Mel.',
-            'Complete Rank 10 charm path with Farnsworth.',
-            'Create Treasure Goblin Vault instance with Seism.',
-        },
-    },
-    ['11.15'] = {
-        label = '11.15 God Progression',
-        steps = {
-            'Collect Realm of the Gods Commendation.',
-            'Turn in Realm of the Gods Commendation to Mel.',
-            'Complete Illuminous confirmations.',
-            'Enter Elddar Forest or Old Kurn\'s Tower for level 71.',
-            'Spend 250 Tier 9 credits for level 72.',
-            'Turn in 4x item 149854 for level 73.',
-            'Turn in items 149855, 149856, 149857, 149858 for level 74.',
-            'Turn in item 149859 for level 75.',
-            'Hail Seism and access Crystallos.',
-            'Turn in Abomination Head to Mel for God Tier 2.',
-        },
-    },
-}
+questData = dataLoad('proeq_quest_data.lua')
 
 questTracker = { tiers = {} }
 
@@ -888,219 +488,459 @@ local function getPctCompleted()
     return tmp / curAch.Count
 end
 
-local function drawCheckBox(spawn)
-    if myAch(curAch.ID).Objective(spawn).Completed() then
-        ImGui.DrawTextureAnimation(done, 15, 15)
-        ImGui.SameLine()
+local QUEST_GROUP_TABS = {
+    { label = 'T1-2', ids = { '11.1', '11.2' } },
+    { label = 'T3-6', ids = { '11.3', '11.4', '11.5', '11.6' } },
+    { label = 'T7-10', ids = { '11.7', '11.8', '11.9', '11.10' } },
+    { label = 'T11-13', ids = { '11.11', '11.12', '11.13' } },
+    { label = 'T14-15', ids = { '11.14', '11.15' } },
+}
+
+local function setTierById(gid)
+    for i, id in ipairs(questTierOrder) do
+        if id == gid then
+            questTierIndex = i
+            questPage = 1
+            questViewAlt = false
+            saveQuestTracker()
+            return true
+        end
+    end
+    return false
+end
+
+local function groupIndexForTier(tierId)
+    for gi, group in ipairs(QUEST_GROUP_TABS) do
+        for _, gid in ipairs(group.ids) do
+            if gid == tierId then return gi end
+        end
+    end
+    return 1
+end
+
+local function buildVisibleQuestSteps(tierId)
+    local data = questData[tierId]
+    local visible = {}
+    if not data then return visible end
+    local searchNorm = normalizeQuestText(questSearchText or '')
+    for idx, step in ipairs(data.steps or {}) do
+        local key = questStepKey(tierId, idx)
+        local checked = isQuestStepDone(tierId, key)
+        local includeMissing = (not questOnlyMissing) or (not checked)
+        local includeSearch = (searchNorm == '') or (normalizeQuestText(step):find(searchNorm, 1, true) ~= nil)
+        if includeMissing and includeSearch then
+            visible[#visible + 1] = { idx = idx, key = key, step = step, checked = checked }
+        end
+    end
+    return visible
+end
+
+local function ensureHudWindow()
+    if win then return win end
+    local w, err = rmlui.open(WIN_NAME, 'UltimateEQ/ui/hud.rml', {
+        width = 520, height = 640, autoclose = true,
+    })
+    if not w then
+        error('[ProEQ] RmlUi open failed: ' .. tostring(err))
+    end
+    w:theme('ember')
+    win = w
+    w:set_value('search', questSearchText or '')
+    w:set_value('altsearch', altCurrencySearch or '')
+    huntRowSlots, stepRowSlots, altRowSlots = -1, -1, -1
+    return win
+end
+
+local function updateHudRml()
+    local w = ensureHudWindow()
+    if not w then return end
+
+    w:class('body', 'see-through', questMiniClearBg)
+
+    w:class('tg_min', 'on', minimize)
+    w:class('tg_spawned', 'on', onlySpawned)
+    w:class('tg_missing', 'on', showOnlyMissing)
+    w:class('tg_quest', 'on', showQuestMini)
+    w:class('tg_auto', 'on', questAutoTrack)
+    w:class('tg_see', 'on', questMiniClearBg)
+    w:class('tg_qmiss', 'on', questOnlyMissing)
+    w:class('tg_nav', 'on', questMiniHideNav)
+    w:text('tg_nav', questMiniHideNav and 'Show tabs' or 'Hide tabs')
+    w:class('alt_live', 'on', altCurrencyLiveRead)
+    w:text('alt_live', altCurrencyLiveRead and 'Live: ON' or 'Live: OFF')
+
+    w:class('quest_panel', 'hidden', not showQuestMini)
+
+    local zoneName = mq.TLO.Zone.Name() or 'Unknown zone'
+    w:text('zone_name', zoneName)
+
+    local huntDone, huntTotal = 0, 0
+    local huntPct = 0
+    local heroTitle = zoneName
+    local heroProg = '--'
+    if curAch.ID then
+        heroTitle = curAch.Name or heroTitle
+        if curAch.Count and curAch.Count > 0 then
+            huntPct = getPctCompleted()
+        end
+        heroProg = totalDone ~= '' and totalDone or '--'
     else
-        ImGui.DrawTextureAnimation(notDone, 15, 15)
-        ImGui.SameLine()
+        heroTitle = 'No hunt in zone'
+        heroProg = '--'
     end
-end
+    w:text('hero_title', heroTitle)
+    w:text('hero_prog', heroProg)
+    w:text('st_hunt', heroProg)
+    w:style('hunt_fill', 'width', string.format('%.1f%%', huntPct * 100))
+    w:text('hunt_txt', heroProg)
 
-local function textEnabled(spawn)
-    ImGui.PushStyleColor(ImGuiCol.Text, 0.690, 0.553, 0.259, 1)
-    ImGui.PushStyleColor(ImGuiCol.HeaderHovered, 0.33, 0.33, 0.33, 0.5)
-    ImGui.PushStyleColor(ImGuiCol.HeaderActive, 0.0, 0.66, 0.33, 0.5)
-    local selSpawn = ImGui.Selectable(spawn, false, ImGuiSelectableFlags.AllowDoubleClick)
-    ImGui.PopStyleColor(3)
-    if selSpawn and ImGui.IsMouseDoubleClicked(0) then
-        mq.cmdf('/nav id %d log=error' , findspawn(spawn))
-        printf('\ayMoving to \ag%s',spawn)
+    local chainDone, chainTotal = getOverallQuestCounts()
+    w:text('st_chain', string.format('%d/%d', chainDone, chainTotal))
+
+    w:class('nav', 'collapsed', questMiniHideNav)
+    w:class('search_box', 'filled', (questSearchText or '') ~= '')
+    w:class('alt_search_box', 'filled', (altCurrencySearch or '') ~= '')
+
+    local tierId = questTierOrder[questTierIndex]
+    local gi = groupIndexForTier(tierId)
+    for i = 1, 5 do
+        w:class('gt' .. i, 'on', (not questViewAlt) and i == gi)
     end
-end
+    w:class('gt_alt', 'on', questViewAlt)
 
-local function hunterProgress()
-    local x, y = ImGui.GetContentRegionAvail()
-    ImGui.PushStyleColor(ImGuiCol.PlotHistogram, 0.690, 0.553, 0.259, 0.5)
-    ImGui.PushStyleColor(ImGuiCol.FrameBg, 0.33, 0.33, 0.33, 0.5)
-    ImGui.SetWindowFontScale(0.85)
-    ImGui.Indent(2)
-    ImGui.ProgressBar(getPctCompleted(), x-4, 14, totalDone)
-    ImGui.PopStyleColor(2)
-    ImGui.SetWindowFontScale(1)
-
-end
-
-local function createLines(spawn)
-    if findspawn(spawn) ~= 0 then
-        drawCheckBox(spawn)
-        textEnabled(spawn)
-    elseif not onlySpawned then
-        drawCheckBox(spawn)
-        ImGui.TextDisabled(spawn)
-    end
-end
-
-local function popupmenu()
-    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize('UltimateEQ Hud')) * 0.5)
-    ImGui.TextColored(0.973, 0.741, 0.129, 1, 'UltimateEQ Hud')
-    ImGui.Separator()
-    ImGui.PushStyleColor(ImGuiCol.Text, 0.690, 0.553, 0.259, 1)
-    ImGui.PushStyleColor(ImGuiCol.HeaderHovered, 0.33, 0.33, 0.33, 0.5)
-    ImGui.PushStyleColor(ImGuiCol.HeaderActive, 0.0, 0.66, 0.33, 0.5)
-
-    minimize = ImGui.MenuItem('Minimize', '', minimize)
-    if ImGui.Selectable('Hide') then 
-        printf('\a#f8bd21Hiding UltimateEQ Hud(\a#b08d42\'/ueq\' to show\ax)') 
-        ShowUI = not ShowUI 
-    end
-    onlySpawned = ImGui.MenuItem('Toggle Spawned Only', '', onlySpawned)
-    showOnlyMissing = ImGui.MenuItem('Toggle Missing Hunts', '', showOnlyMissing)
-    showQuestMini = ImGui.MenuItem('Toggle Quest Mini', '', showQuestMini)
-    questOnlyMissing = ImGui.MenuItem('Show Missing-Only Steps', '', questOnlyMissing)
-    questAutoTrack = ImGui.MenuItem('Toggle Quest Auto-Track', '', questAutoTrack)
-    if ImGui.Selectable('Reset Current Quest Tier') then
-        local tierId = questTierOrder[questTierIndex]
-        questTracker.tiers[tierId] = {}
-        saveQuestTracker()
-    end
-    ImGui.Separator()
-    ImGui.PushStyleColor(ImGuiCol.Text, 0.973, 0.741, 0.129, 1)
-    if ImGui.Selectable('Stop UltimateEQ Hud') then Open = false end
-    saveQuestTracker()
-    ImGui.PopStyleColor(4)
-    ImGui.EndPopup()
-end
-
-local function PCList()
-    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize('Players in Zone')) * 0.5)
-    ImGui.TextColored(0.973, 0.741, 0.129, 1, 'Players in Zone')
-    ImGui.Separator()
-    ImGui.PushStyleColor(ImGuiCol.Text, 0.690, 0.553, 0.259, 1)
-    --ImGui.PushStyleColor(ImGuiCol.HeaderHovered, 0.33, 0.33, 0.33, 0.5)
-    --ImGui.PushStyleColor(ImGuiCol.HeaderActive, 0.0, 0.66, 0.33, 0.5)
-
-    for i = 1, mq.TLO.SpawnCount('pc')() do
-        local player = mq.TLO.NearestSpawn(i,'pc')
-        ImGui.Text(string.format('%s [%d - %s] - %s', player.Name(), player.Level(), player.Class(), player.Guild() or 'No Guild'))
-    end
-    ImGui.Separator()
-    ImGui.PushStyleColor(ImGuiCol.Text, 0.973, 0.741, 0.129, 1)
-    --bottom line
-    ImGui.PopStyleColor(2)
-    ImGui.EndPopup()
-end
-
-local function RenderHunter()
-    hunterProgress()
-    if not minimize then ImGui.Separator() end
-    for index, hunterSpawn in ipairs(myHunterSpawn) do
-
-        if not minimize then
-            if showOnlyMissing then
-                if not myAch(curAch.ID).Objective(hunterSpawn).Completed() then
-                    createLines(hunterSpawn)
-                end
+    local group = QUEST_GROUP_TABS[gi]
+    if group then
+        for ti = 1, 4 do
+            local gid = group.ids[ti]
+            local tabId = 'tt' .. ti
+            if gid then
+                local label = questData[gid] and questData[gid].label or gid
+                w:text(tabId, label)
+                w:class(tabId, 'on', (not questViewAlt) and gid == tierId)
             else
-                createLines(hunterSpawn)
+                w:text(tabId, '-')
+                w:class(tabId, 'on', false)
             end
         end
     end
-end 
 
-local function InfoLine()
-    ImGui.Separator()
-    ImGui.TextColored(0.690, 0.553, 0.259, 1,'\xee\x9f\xbc')
-    --[[if ImGui.BeginPopupContextItem('pcpopup') then
-        PCList()
-    end]]--
-    ImGui.SameLine()
-    local pcs = mq.TLO.SpawnCount('pc')() - mq.TLO.SpawnCount('group pc')()
-    
-    if pcs > 50 then 
-        ImGui.TextColored(0.95, 0.05, 0.05, 1, tostring(pcs))
-    elseif pcs > 25 then 
-        ImGui.TextColored(0.95, 0.95, 0.05, 1, tostring(pcs))
-    elseif pcs > 0 then 
-        ImGui.TextColored(0.05, 0.95, 0.05, 1, tostring(pcs))
-    else
-        ImGui.TextDisabled(tostring(pcs))
+    w:class('quest_body', 'hidden', questViewAlt)
+    w:class('alt_body', 'hidden', not questViewAlt)
+
+    if questViewAlt then
+        if altCurrencyLiveRead then
+            local now = os.time()
+            if now ~= altCurrencyLastRefresh then
+                altCurrencyLastRefresh = now
+                refreshAltCurrencyFromGame()
+            end
+        end
+        local searchNorm = (altCurrencySearch or ''):lower()
+        local rows = {}
+        for _, cur in ipairs(altCurrencyList) do
+            if searchNorm == '' or cur.name:lower():find(searchNorm, 1, true) then
+                rows[#rows + 1] = cur
+            end
+        end
+        if altRowSlots ~= #rows then
+            local parts = {}
+            for i = 1, #rows do
+                parts[i] = string.format(
+                    '<div id="ar%d" class="alt-row"><span id="ar%dn" class="alt-name"></span><span id="ar%dv" class="alt-val"></span></div>',
+                    i, i, i)
+            end
+            w.cache = {}
+            w:rml('alt_list', table.concat(parts))
+            altRowSlots = #rows
+        end
+        for i, cur in ipairs(rows) do
+            w:text('ar' .. i .. 'n', cur.name)
+            w:text('ar' .. i .. 'v', tostring(altCurrencyData[cur.name] or 0))
+        end
+    elseif showQuestMini and not minimize then
+        local data = questData[tierId]
+        if data then
+            w:text('q_label', data.label or tierId)
+            local doneCount, totalCount = getQuestCounts(tierId)
+            local pct = totalCount > 0 and (doneCount / totalCount) or 0
+            w:text('q_prog', string.format('Tier Progress: %d/%d Steps', doneCount, totalCount))
+            w:style('q_fill', 'width', string.format('%.1f%%', pct * 100))
+            local overallDone, overallTotal = getOverallQuestCounts()
+            local overallPct = overallTotal > 0 and (overallDone / overallTotal) or 0
+            w:text('q_chain', string.format('Overall Chain: %d/%d', overallDone, overallTotal))
+            w:style('c_fill', 'width', string.format('%.1f%%', overallPct * 100))
+
+            visibleStepsCache = buildVisibleQuestSteps(tierId)
+            local totalPages = math.max(1, math.ceil(#visibleStepsCache / questStepsPerPage))
+            if questPage > totalPages then questPage = totalPages end
+            if questPage < 1 then questPage = 1 end
+            w:text('q_page', string.format('Page %d / %d', questPage, totalPages))
+            w:text('q_auto', questAutoLastMsg or '')
+
+            local startIdx = ((questPage - 1) * questStepsPerPage) + 1
+            local endIdx = math.min(#visibleStepsCache, startIdx + questStepsPerPage - 1)
+            local pageCount = math.max(0, endIdx - startIdx + 1)
+
+            if stepRowSlots ~= pageCount then
+                local parts = {}
+                for i = 1, pageCount do
+                    parts[i] = string.format(
+                        '<div id="qs%d" class="step-row" action="step:%d"><span id="qs%db" class="step-box">&#xE739;</span><span id="qs%dt" class="step-txt"></span></div>',
+                        i, i, i, i)
+                end
+                w.cache = {}
+                w:rml('steps', table.concat(parts))
+                stepRowSlots = pageCount
+            end
+            for i = 1, pageCount do
+                local row = visibleStepsCache[startIdx + i - 1]
+                if row then
+                    w:text('qs' .. i .. 't', row.step)
+                    w:class('qs' .. i, 'on', row.checked)
+                    w:text('qs' .. i .. 'b', row.checked and '&#xE73E;' or '&#xE739;')
+                end
+            end
+        end
     end
 
-    ImGui.SameLine() ImGui.TextDisabled('|')
+    if curAch.ID then
+        if minimize then
+            if huntRowSlots ~= 0 then
+                w:rml('hunt_list', '')
+                huntRowSlots = 0
+            end
+        else
+        local rows = {}
+        for _, spawn in ipairs(myHunterSpawn) do
+            local completed = myAch(curAch.ID).Objective(spawn).Completed()
+            if showOnlyMissing and completed then
+                -- skip
+            else
+                local sid = findspawn(spawn)
+                if (not onlySpawned) or sid ~= 0 then
+                    rows[#rows + 1] = { spawn = spawn, completed = completed, sid = sid }
+                end
+            end
+        end
+        if huntRowSlots ~= #rows then
+            local parts = {}
+            for i = 1, #rows do
+                parts[i] = string.format(
+                    '<div id="h%d" class="hunt-row" action="hunt:%d"><span id="h%dc" class="hunt-chk">&#xE739;</span><span id="h%dn" class="hunt-name"></span></div>',
+                    i, i, i, i)
+            end
+            w.cache = {}
+            w:rml('hunt_list', table.concat(parts))
+            huntRowSlots = #rows
+        end
+        for i, row in ipairs(rows) do
+            w:text('h' .. i .. 'n', row.spawn)
+            w:class('h' .. i, 'done', row.completed)
+            w:class('h' .. i, 'spawned', row.sid ~= 0)
+            w:text('h' .. i .. 'c', row.completed and '&#xE73E;' or '&#xE739;')
+        end
+        end
+    elseif huntRowSlots ~= 0 then
+        w:rml('hunt_list', '')
+        huntRowSlots = 0
+    end
+
+    local pcs = mq.TLO.SpawnCount('pc')() - mq.TLO.SpawnCount('group pc')()
+    w:text('if_pcs', tostring(pcs))
+    w:class('if_pcs', 'zero', pcs == 0)
+    w:class('if_pcs', 'ok', pcs > 0 and pcs <= 25)
+    w:class('if_pcs', 'warn', pcs > 25 and pcs <= 50)
+    w:class('if_pcs', 'danger', pcs > 50)
+
+    for i = 1, 6 do
+        w:class('fk' .. i, 'hidden', true)
+    end
     if mq.TLO.Group() ~= nil then
         for i = 0, mq.TLO.Group.Members() do
             local member = mq.TLO.Group.Member(i)
-            if member.Present() and not member.Mercenary() then
-                ImGui.SameLine()
-                if not member.Invis() then 
-                    ImGui.TextColored(0.0, 0.95, 0.0, 1, 'F'..i+1)
-                elseif member.Invis('NORMAL')() and not member.Invis('IVU')() then 
-                    ImGui.TextDisabled('F'..i+1) 
+            if member.Present() and not member.Mercenary() and i < 6 then
+                w:class('fk' .. (i + 1), 'hidden', false)
+                if not member.Invis() then
+                    w:text('fk' .. (i + 1), 'F' .. (i + 1))
+                elseif member.Invis('NORMAL')() and not member.Invis('IVU')() then
+                    w:text('fk' .. (i + 1), 'F' .. (i + 1))
                 end
             end
-        
         end
-    else
-        if not mq.TLO.Me.Invis() then 
-            ImGui.SameLine()
-            ImGui.TextColored(0.0, 0.95, 0.0, 1, 'F1')
-        end
+    elseif not mq.TLO.Me.Invis() then
+        w:class('fk1', 'hidden', false)
+        w:text('fk1', 'F1')
     end
-    ImGui.SameLine() ImGui.TextDisabled('|')
-    ImGui.SameLine()
-    spawnUp = 0
-    if spawnUp == 0 then ImGui.TextDisabled('\xee\x9f\xb5')  end
-    if spawnUp == 1 then ImGui.TextColored(0.973, 0.741, 0.129, 1, '\xee\x9f\xb5') end
-    if spawnUp == 2 then ImGui.TextColored(0.0129, 0.973, 0.129, 1, '\xee\x9f\xb5') end
 
+    w:class('if_spawn', 'up', spawnUp == 1)
+    w:class('if_spawn', 'hot', spawnUp == 2)
+    w:text('if_spawn_txt', spawnUp == 0 and 'No spawns' or 'Spawns up')
 end
 
-local function RenderTitle()
-    ImGui.SetWindowFontScale(1.15)
-    local title = 0
-    if curAch.ID then 
-        title = curAch.Name
-    else
-        title = mq.TLO.Zone.Name()
+local function handleHudEvent(ev)
+    local a = ev.action or ''
+    if ev.type == 'change' then
+        if ev.id == 'search' then
+            questSearchText = ev.value or ''
+            questPage = 1
+            stepRowSlots = -1
+            return
+        end
+        if ev.id == 'altsearch' then
+            altCurrencySearch = ev.value or ''
+            altRowSlots = -1
+            return
+        end
+        return
     end
-    ImGui.SetCursorPosX((ImGui.GetWindowWidth() - ImGui.CalcTextSize(title)) * 0.5)
-    ImGui.TextColored(0.973, 0.741, 0.129, 1, title)
-    ImGui.SetWindowFontScale(1)
-    if ImGui.BeginPopupContextItem('titlepopup') then
-        popupmenu()
+    if ev.type ~= 'click' and ev.type ~= 'dblclick' then return end
+
+    if a == 'window:close' then
+        ShowUI = false
+        printf('\a#f8bd21Hiding ProEQ Hud(\a#b08d42\'/proeq\' to show\ax)')
+        return
+    end
+    if a == 'stop' then
+        Open = false
+        return
+    end
+
+    if a == 'tog:min' then minimize = not minimize; huntRowSlots = -1; return end
+    if a == 'tog:spawned' then onlySpawned = not onlySpawned; huntRowSlots = -1; return end
+    if a == 'tog:missing' then showOnlyMissing = not showOnlyMissing; huntRowSlots = -1; return end
+    if a == 'tog:quest' then showQuestMini = not showQuestMini; saveQuestTracker(); return end
+    if a == 'tog:auto' then questAutoTrack = not questAutoTrack; saveQuestTracker(); return end
+    if a == 'tog:see' then questMiniClearBg = not questMiniClearBg; saveQuestTracker(); return end
+    if a == 'tog:nav' then questMiniHideNav = not questMiniHideNav; saveQuestTracker(); return end
+    if a == 'tog:qmiss' then questOnlyMissing = not questOnlyMissing; stepRowSlots = -1; saveQuestTracker(); return end
+    if a == 'reset:tier' then
+        local tierId = questTierOrder[questTierIndex]
+        questTracker.tiers[tierId] = {}
+        saveQuestTracker()
+        stepRowSlots = -1
+        return
+    end
+    if a == 'alt:refresh' then refreshAltCurrencyFromGame(); altRowSlots = -1; return end
+    if a == 'alt:live' then altCurrencyLiveRead = not altCurrencyLiveRead; return end
+
+    if a == 'grp:alt' then
+        questViewAlt = true
+        altRowSlots = -1
+        return
+    end
+    local grp = tonumber(a:match('^grp:(%d+)$'))
+    if grp and QUEST_GROUP_TABS[grp] then
+        questViewAlt = false
+        setTierById(QUEST_GROUP_TABS[grp].ids[1])
+        stepRowSlots, altRowSlots = -1, -1
+        return
+    end
+
+    local tierPick = tonumber(a:match('^tier:(%d+)$'))
+    if tierPick then
+        local gi = groupIndexForTier(questTierOrder[questTierIndex])
+        local gid = QUEST_GROUP_TABS[gi] and QUEST_GROUP_TABS[gi].ids[tierPick]
+        if gid then setTierById(gid) end
+        questViewAlt = false
+        stepRowSlots = -1
+        return
+    end
+
+    if a == 'pg:first' then questPage = 1; stepRowSlots = -1; return end
+    if a == 'pg:prev' then questPage = math.max(1, questPage - 1); stepRowSlots = -1; return end
+    if a == 'pg:next' then questPage = questPage + 1; stepRowSlots = -1; return end
+    if a == 'pg:last' then
+        local vis = buildVisibleQuestSteps(questTierOrder[questTierIndex])
+        questPage = math.max(1, math.ceil(#vis / questStepsPerPage))
+        stepRowSlots = -1
+        return
+    end
+
+    local stepIdx = tonumber(a:match('^step:(%d+)$'))
+    if stepIdx and ev.type == 'click' then
+        local row = visibleStepsCache[((questPage - 1) * questStepsPerPage) + stepIdx]
+        if row then
+            setQuestStepDone(questTierOrder[questTierIndex], row.key, not row.checked)
+            stepRowSlots = -1
+        end
+        return
+    end
+
+    local huntIdx = tonumber(a:match('^hunt:(%d+)$'))
+    if huntIdx and ev.type == 'dblclick' then
+        local spawn = nil
+        local n = 0
+        for _, s in ipairs(myHunterSpawn) do
+            local completed = myAch(curAch.ID).Objective(s).Completed()
+            if not (showOnlyMissing and completed) then
+                local sid = findspawn(s)
+                if (not onlySpawned) or sid ~= 0 then
+                    n = n + 1
+                    if n == huntIdx then
+                        spawn = s
+                        if sid ~= 0 then
+                            mq.cmdf('/nav id %d log=error', sid)
+                            printf('\ayMoving to \ag%s', s)
+                        end
+                        break
+                    end
+                end
+            end
+        end
     end
 end
 
-local function UltimateEQHud()
+local function drawLogoFloat()
+    if not ueqFloat or not ueqFloat.drawFloating then return end
     ueqFloat.drawFloating({
-        id = 'UEQHud',
-        resourceName = 'UltimateEQ Hud',
-        windowTitle = 'Hide / show — UltimateEQ',
-        imageRelPath = 'UltimateEQ/ueq-helper.png',
+        id = 'ProEQHud',
+        resourceName = 'ProEQ Hud',
+        windowTitle = 'Hide / show — ProEQ',
+        imageRelPath = 'ProEQ/proeq-helper.png',
         placement = 'top_left',
         sizePx = 100,
-        fallbackLabel = 'UEQ',
-        isAnyOpen = function()
-            return ShowUI == true
-        end,
+        fallbackLabel = 'PEQ',
+        isAnyOpen = function() return ShowUI == true end,
         onClick = function()
             ShowUI = not ShowUI
             if ShowUI then
-                printf('\a#f8bd21Showing UltimateEQ Hud')
+                printf('\a#f8bd21Showing ProEQ Hud')
             else
-                printf('\a#f8bd21Hiding UltimateEQ Hud')
+                printf('\a#f8bd21Hiding ProEQ Hud')
             end
         end,
         tooltipHide = 'Hide tracker window (click again to show)',
         tooltipShow = 'Show tracker window',
     })
+end
 
-    if ShowUI then
-        local themeToken = themeBridge.push()
-        local pv, pc = push_spawnmaster_theme()
-        ImGui.SetNextWindowSize(520, 600, ImGuiCond.FirstUseEver)
-        Open, _ = ImGui.Begin('UltimateEQ Hud', Open, WindowFlags)
-        RenderTitle()
-        if curAch.ID then 
-            RenderHunter() 
+local function hudTick()
+    if not Open then return end
+    local w = ensureHudWindow()
+    if not w then return end
+    -- Always drain events while the script runs so autoclose can detect /lua stop,
+    -- and so hide/toggle does not orphan the window after 5s.
+    for ev in w:events() do
+        local ok, err = pcall(handleHudEvent, ev)
+        if not ok then printf('[ProEQ] event error: %s', tostring(err)) end
+    end
+    if not ShowUI then
+        w:show(false)
+        return
+    end
+    if not w:is_open() then
+        Open = false
+        return
+    end
+    w:show(true)
+    local t = mq.gettime and mq.gettime() or (os.time() * 1000)
+    if t >= nextHudUpdate then
+        nextHudUpdate = t + 200
+        local ok, err = pcall(updateHudRml)
+        if not ok then
+            printf('[ProEQ] UI update error: %s', tostring(err))
+            nextHudUpdate = t + 1000
         end
-        renderQuestMini()
-        InfoLine()
-        ImGui.End()
-        pop_spawnmaster_theme(pv, pc)
-        themeBridge.pop(themeToken)
     end
 end
 
@@ -1114,7 +954,7 @@ local function updateTables()
             Name = myAch(AchID()).Name(),
             Count = myAch(AchID()).ObjectiveCount()
         }
-        printf('\a#f8bd21Updating UltimateEQ Hud(\a#b08d42%s\a#f8bd21)', curAch.Name)
+        printf('\a#f8bd21Updating ProEQ Hud(\a#b08d42%s\a#f8bd21)', curAch.Name)
         local i = 0
         repeat
             if myAch(AchID()).ObjectiveByIndex(i)() ~= nil then
@@ -1135,14 +975,15 @@ local function normalizeSlashCommand(cmd)
     return c
 end
 
-local function toggleUltimateEQHud()
+local function toggleProEQHud()
     local VividOrange = '\a#f8bd21'
     if ShowUI then
-        printf('%sHiding UltimateEQ Hud', VividOrange)
+        printf('%sHiding ProEQ Hud', VividOrange)
         ShowUI = false
     else
-        printf('%sShowing UltimateEQ Hud', VividOrange)
+        printf('%sShowing ProEQ Hud', VividOrange)
         ShowUI = true
+        nextHudUpdate = 0
     end
 end
 
@@ -1152,22 +993,22 @@ local function bindToggleCommand(cmd)
         pcall(mq.unbind, activeToggleCommand)
     end
     if activeToggleCommand ~= desired then
-        mq.bind(desired, toggleUltimateEQHud)
+        mq.bind(desired, toggleProEQHud)
         activeToggleCommand = desired
+        toggleCommand = desired
     end
-    toggleCommand = desired
 end
 
-local function bind_ueq(cmd)
+local function bind_proeq(cmd)
     local VividOrange = '\a#f8bd21'
     local DarkOrange  = '\a#b08d42'
     local raw = tostring(cmd or ''):gsub('^%s+', ''):gsub('%s+$', '')
     local lower = raw:lower()
 
     if raw == '' then
-        toggleUltimateEQHud()
+        toggleProEQHud()
     elseif lower == 'stop' then
-        printf('%sUltimateEQ Hud Ended', VividOrange)
+        printf('%sProEQ Hud Ended', VividOrange)
         Open = false
     elseif lower == 'quest' then
         showQuestMini = not showQuestMini
@@ -1189,15 +1030,15 @@ local function bind_ueq(cmd)
         local newCmd = raw:match('^bind%s+(.+)$')
         bindToggleCommand(newCmd)
         saveQuestTracker()
-        printf('%sUltimateEQ Hud toggle command set to %s%s', VividOrange, DarkOrange, toggleCommand)
+        printf('%sProEQ Hud toggle command set to %s%s', VividOrange, DarkOrange, toggleCommand)
     else
-        printf('%sUltimateEQ Hud usage:', VividOrange)
-        printf('%s/ueq %sToggles showing and hiding UltimateEQ Hud', VividOrange, DarkOrange)
-        printf('%s/ueq quest %sToggles the UltimateEQ Quest Mini', VividOrange, DarkOrange)
-        printf('%s/ueq questauto %sToggles quest auto-track from chat events', VividOrange, DarkOrange)
-        printf('%s/ueq bind /mytoggle %sSets custom slash command to toggle window', VividOrange, DarkOrange)
+        printf('%sProEQ Hud usage:', VividOrange)
+        printf('%s/proeq %sToggles showing and hiding ProEQ Hud', VividOrange, DarkOrange)
+        printf('%s/proeq quest %sToggles the ProEQ Quest Mini', VividOrange, DarkOrange)
+        printf('%s/proeq questauto %sToggles quest auto-track from chat events', VividOrange, DarkOrange)
+        printf('%s/proeq bind /mytoggle %sSets custom slash command to toggle window', VividOrange, DarkOrange)
         printf('%sCurrent toggle bind: %s%s', VividOrange, DarkOrange, toggleCommand)
-        printf('%s/ueq stop %sStop UltimateEQ Hud', VividOrange, DarkOrange)
+        printf('%s/proeq stop %sStop ProEQ Hud', VividOrange, DarkOrange)
     end
 
     return
@@ -1239,19 +1080,37 @@ mq.event('hh_quest_autotrack_complete_3', '#*#has finished the quest: #1#!#*#', 
     autoTrackQuestCompletion(completedText)
 end)
 
-mq.imgui.init('ultimateeq_hud', UltimateEQHud)
-mq.bind('/ueq', bind_ueq)
+pcall(function() mq.imgui.init('proeq_hud_float', drawLogoFloat) end)
+mq.bind('/proeq', bind_proeq)
+mq.bind('/ueq', bind_proeq)
 loadQuestTracker()
 loadAltCurrency()
 bindToggleCommand(toggleCommand)
+updateTables()
+mq.cmd('/echo [ProEQ] RmlUi HUD loaded. /proeq  /ueq  — /proeq stop to end')
 
-while Open do
-    if oldZone ~= myZone() then
-        updateTables()
-        oldZone = myZone()
-    end
-    mq.delay(250)
+local function cleanup()
+    pcall(function() rmlui.close_all() end)
+    pcall(function() mq.unbind('/proeq') end)
+    pcall(function() mq.unbind('/ueq') end)
+    if activeToggleCommand then pcall(mq.unbind, activeToggleCommand) end
 end
+
+local ok, err = pcall(function()
+    while Open do
+        mq.doevents()
+        hudTick()
+        if oldZone ~= myZone() then
+            updateTables()
+            huntRowSlots = -1
+            nextHudUpdate = 0
+            oldZone = myZone()
+        end
+        mq.delay(50)
+    end
+end)
+if not ok and err then printf('[ProEQ] stop: %s', tostring(err)) end
+cleanup()
 
 
 

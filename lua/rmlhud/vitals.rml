@@ -1,0 +1,64 @@
+<rml>
+<head>
+	<title>Vitals</title>
+	<link type="text/template" href="../rmlui/theme/window.rml"/>
+	<link type="text/rcss" href="rmlhud.rcss"/>
+</head>
+<body template="window">
+	<div class="ident">
+		<div id="classtile" class="tile">WIZ</div>
+		<div>
+			<div class="name-row">
+				<span id="name" class="name">Eniine</span>
+				<span class="badge">COMBAT</span>
+			</div>
+			<div id="sub" class="sub">Level 65 Wizard</div>
+		</div>
+	</div>
+
+	<div class="bars">
+		<div id="hp_row" class="stat hp">
+			<div class="stat-head"><span class="label">Health</span><span id="hp_txt" class="val">0 / 0</span><span id="hp_pct" class="pct">0%</span></div>
+			<div class="track"><div id="hp_fill" class="fill"></div></div>
+		</div>
+		<div id="mana_row" class="stat mana">
+			<div class="stat-head"><span class="label">Mana</span><span id="mana_txt" class="val">0 / 0</span><span id="mana_pct" class="pct">0%</span></div>
+			<div class="track"><div id="mana_fill" class="fill"></div></div>
+		</div>
+		<div id="end_row" class="stat end">
+			<div class="stat-head"><span class="label">Endurance</span><span id="end_txt" class="val">0 / 0</span><span id="end_pct" class="pct">0%</span></div>
+			<div class="track"><div id="end_fill" class="fill"></div></div>
+		</div>
+	</div>
+
+	<div class="xp">
+		<div class="xp-item">
+			<div class="xp-head"><span class="label">XP</span><span id="xp_txt" class="pct">0%</span></div>
+			<div class="track thin"><div id="xp_fill" class="fill"></div></div>
+		</div>
+		<div class="xp-item">
+			<div class="xp-head"><span class="label">AA</span><span id="aa_txt" class="pct">0 pts</span></div>
+			<div class="track thin"><div id="aa_fill" class="fill"></div></div>
+		</div>
+	</div>
+
+	<div id="target" class="section target empty">
+		<div class="target-head">
+			<span id="t_name" class="tname">No target</span>
+			<span id="t_info" class="tinfo"></span>
+		</div>
+		<div class="track"><div id="t_fill" class="fill"></div></div>
+	</div>
+
+	<div id="buffs" class="section buffs">
+		<div class="section-head"><span class="label">Buffs</span></div>
+		<div id="buff_list" class="buff-list"></div>
+	</div>
+
+	<div class="actions">
+		<div id="btn_sit" class="btn" action="sit">Sit</div>
+		<div class="btn" action="target_self">Target Self</div>
+		<div class="btn" action="clear_target">Clear</div>
+	</div>
+</body>
+</rml>

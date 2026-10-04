@@ -1,0 +1,280 @@
+/*
+  MQ2RmlUi window theme. Use from any document:
+    <link type="text/template" href="<path to>/rmlui/theme/window.rml"/>
+    <body template="window"> ...content... </body>
+
+  The plugin maintains these classes on <body>: focused, collapsed, pinned.
+  Accent themes (class on <body>): theme-azure (default), theme-violet, theme-ember, theme-jade, theme-rose.
+*/
+
+@spritesheet window-theme
+{
+	src: shadow.png;
+	shadow-outer: 0px 0px 96px 96px;
+	shadow-inner: 42px 42px 12px 12px;
+}
+
+body, div, p, h1, h2, h3, section, header, footer, ul, li { display: block; }
+span, b, i, em, strong { display: inline; }
+b, strong { font-weight: bold; }
+i, em { font-style: italic; }
+
+body {
+	font-family: Segoe UI;
+	font-size: 13dp;
+	color: #e7eaf3;
+	margin: 0;
+	padding: 0;
+	width: 100%;
+	height: 100%;
+}
+
+/* ---------------- frame ---------------- */
+
+#window-shadow {
+	position: absolute;
+	left: -6dp; top: -6dp; right: -6dp; bottom: -6dp;
+	decorator: ninepatch(shadow-outer, shadow-inner, 1.0);
+	opacity: 0.75;
+	transition: opacity 0.25s cubic-out;
+}
+body.focused #window-shadow { opacity: 1; }
+
+#window-frame {
+	position: absolute;
+	left: 22dp; top: 22dp; right: 22dp; bottom: 22dp;
+	display: flex;
+	flex-direction: column;
+	border-radius: 14dp;
+	border: 1dp #ffffff14;
+	decorator: vertical-gradient(#1b2132f6 #0c0f17f8);
+	overflow: hidden;
+	animation: 0.28s cubic-out window-open;
+	transition: border-color 0.25s cubic-out;
+}
+@keyframes window-open {
+	from { opacity: 0; transform: translateY(10dp) scale(0.97); }
+	to   { opacity: 1; transform: translateY(0dp) scale(1); }
+}
+
+#window-titlebar {
+	flex: 0 0 auto;
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	height: 38dp;
+	padding: 0 6dp 0 12dp;
+	decorator: vertical-gradient(#ffffff0c #ffffff03);
+	cursor: move;
+}
+#window-icon {
+	width: 8dp;
+	height: 8dp;
+	margin-right: 10dp;
+	border-radius: 4dp;
+	transition: background-color 0.25s cubic-out;
+}
+#window-title {
+	font-size: 12.5dp;
+	font-weight: bold;
+	letter-spacing: 0.4dp;
+	color: #9aa3b8;
+	white-space: nowrap;
+	transition: color 0.25s cubic-out;
+}
+body.focused #window-title { color: #f2f4fa; }
+.window-spacer { flex: 1; }
+
+.window-button {
+	width: 28dp;
+	height: 26dp;
+	line-height: 26dp;
+	margin-left: 2dp;
+	text-align: center;
+	border-radius: 7dp;
+	font-family: Icons;
+	font-size: 10dp;
+	color: #7f889d;
+	opacity: 0.55;
+	transition: background-color color opacity 0.15s cubic-out;
+}
+#window-titlebar:hover .window-button, body.focused .window-button { opacity: 1; }
+.window-button:hover { background-color: #ffffff17; color: #ffffff; }
+.window-button:active { background-color: #ffffff26; }
+.window-button.close:hover { background-color: #e5484d; color: #ffffff; }
+body.pinned #window-pin { opacity: 1; }
+body.collapsed #window-collapse { transform: rotate(180deg); }
+
+#window-accent {
+	flex: 0 0 auto;
+	height: 2dp;
+	background-color: #ffffff12;
+	transition: opacity 0.25s cubic-out;
+}
+
+#window-content {
+	flex: 1 1 auto;
+	padding: 12dp 14dp 16dp 14dp;
+	overflow-x: hidden;
+	overflow-y: auto;
+	animation: 0.35s cubic-out content-in;
+}
+@keyframes content-in {
+	from { opacity: 0; }
+	to   { opacity: 1; }
+}
+body.collapsed #window-content, body.collapsed #window-grip { display: none; }
+body.collapsed #window-accent { opacity: 0; }
+
+#window-grip {
+	position: absolute;
+	right: 0; bottom: 0;
+	width: 16dp; height: 16dp;
+	cursor: resize;
+	decorator: vertical-gradient(#ffffff00 #ffffff00);
+}
+#window-grip:hover { decorator: vertical-gradient(#ffffff00 #ffffff22); }
+body.pinned #window-grip { display: none; }
+
+/* ---------------- accent themes ---------------- */
+
+body.theme-azure #window-icon            { background-color: #4c8dff; }
+body.theme-azure.focused #window-frame   { border-color: #4c8dff66; }
+body.theme-azure #window-accent          { decorator: horizontal-gradient(#4c8dffcc #47c8f000); }
+body.theme-azure.pinned #window-pin      { color: #4c8dff; }
+body.theme-azure .accent                 { color: #6fa3ff; }
+body.theme-azure .btn.primary            { background-color: #3d74e0; border-color: #6fa3ff66; }
+body.theme-azure .btn.primary:hover      { background-color: #4c8dff; }
+
+body.theme-violet #window-icon           { background-color: #9b6bff; }
+body.theme-violet.focused #window-frame  { border-color: #9b6bff66; }
+body.theme-violet #window-accent         { decorator: horizontal-gradient(#9b6bffcc #e17bff00); }
+body.theme-violet.pinned #window-pin     { color: #9b6bff; }
+body.theme-violet .accent                { color: #b896ff; }
+body.theme-violet .btn.primary           { background-color: #7a4fe0; border-color: #b896ff66; }
+body.theme-violet .btn.primary:hover     { background-color: #9b6bff; }
+
+body.theme-ember #window-icon            { background-color: #ff7a45; }
+body.theme-ember.focused #window-frame   { border-color: #ff7a4566; }
+body.theme-ember #window-accent          { decorator: horizontal-gradient(#ff7a45cc #ffcf4500); }
+body.theme-ember.pinned #window-pin      { color: #ff7a45; }
+body.theme-ember .accent                 { color: #ff9a6b; }
+body.theme-ember .btn.primary            { background-color: #d9602f; border-color: #ff9a6b66; }
+body.theme-ember .btn.primary:hover      { background-color: #ff7a45; }
+
+body.theme-jade #window-icon             { background-color: #2fcf95; }
+body.theme-jade.focused #window-frame    { border-color: #2fcf9566; }
+body.theme-jade #window-accent           { decorator: horizontal-gradient(#2fcf95cc #47c8f000); }
+body.theme-jade.pinned #window-pin       { color: #2fcf95; }
+body.theme-jade .accent                  { color: #5fe0b0; }
+body.theme-jade .btn.primary             { background-color: #22a678; border-color: #5fe0b066; }
+body.theme-jade .btn.primary:hover       { background-color: #2fcf95; }
+
+body.theme-rose #window-icon             { background-color: #ff5c8a; }
+body.theme-rose.focused #window-frame    { border-color: #ff5c8a66; }
+body.theme-rose #window-accent           { decorator: horizontal-gradient(#ff5c8acc #ff9a5c00); }
+body.theme-rose.pinned #window-pin       { color: #ff5c8a; }
+body.theme-rose .accent                  { color: #ff85a6; }
+body.theme-rose .btn.primary             { background-color: #d94470; border-color: #ff85a666; }
+body.theme-rose .btn.primary:hover       { background-color: #ff5c8a; }
+
+/* ---------------- scrollbars ---------------- */
+
+scrollbarvertical { width: 10dp; margin-right: -10dp; }
+scrollbarvertical slidertrack { background-color: #00000000; }
+scrollbarvertical sliderbar {
+	margin-left: 3dp;
+	width: 4dp;
+	min-height: 28dp;
+	border-radius: 2dp;
+	background-color: #ffffff22;
+	transition: background-color width margin-left 0.15s cubic-out;
+}
+scrollbarvertical:hover sliderbar { width: 6dp; margin-left: 2dp; background-color: #ffffff40; }
+scrollbarvertical sliderbar:active { background-color: #ffffff66; }
+scrollbarvertical sliderarrowdec, scrollbarvertical sliderarrowinc { width: 0; height: 0; }
+
+scrollbarhorizontal { height: 10dp; margin-bottom: -10dp; }
+scrollbarhorizontal sliderbar { margin-top: 3dp; height: 4dp; min-width: 28dp; border-radius: 2dp; background-color: #ffffff22; }
+scrollbarhorizontal sliderarrowdec, scrollbarhorizontal sliderarrowinc { width: 0; height: 0; }
+
+/* ---------------- component kit ---------------- */
+
+h1 { font-size: 18dp; font-weight: bold; color: #ffffff; margin-bottom: 6dp; }
+h2 { font-size: 11dp; font-weight: bold; color: #8d97ad; text-transform: uppercase; letter-spacing: 1dp; margin: 10dp 0 6dp 0; }
+p  { margin-bottom: 6dp; line-height: 1.4; }
+.muted { color: #8d97ad; }
+.row { display: flex; flex-direction: row; align-items: center; gap: 8dp; }
+.col { display: flex; flex-direction: column; gap: 8dp; }
+.grow { flex: 1; }
+
+.section {
+	padding: 10dp 12dp;
+	border-radius: 10dp;
+	background-color: #ffffff08;
+	border: 1dp #ffffff0e;
+}
+
+.btn {
+	display: inline-block;
+	padding: 5dp 14dp;
+	text-align: center;
+	border-radius: 8dp;
+	font-size: 12dp;
+	font-weight: bold;
+	color: #d3d9e8;
+	background-color: #ffffff10;
+	border: 1dp #ffffff14;
+	transition: background-color color border-color 0.15s cubic-out;
+}
+.btn:hover { background-color: #ffffff20; color: #ffffff; }
+.btn:active { background-color: #ffffff30; }
+.btn.primary { color: #ffffff; }
+
+.chip {
+	display: inline-block;
+	padding: 1dp 8dp;
+	border-radius: 9dp;
+	font-size: 10.5dp;
+	font-weight: bold;
+	color: #c9d1e3;
+	background-color: #ffffff14;
+}
+
+input.text, textarea {
+	display: inline-block;
+	padding: 5dp 9dp;
+	border-radius: 8dp;
+	color: #f2f4fa;
+	background-color: #00000040;
+	border: 1dp #ffffff1a;
+	transition: border-color background-color 0.15s cubic-out;
+}
+input.text:hover, textarea:hover { border-color: #ffffff33; }
+input.text:focus, textarea:focus { border-color: #ffffff66; background-color: #00000060; }
+input.text { height: 18dp; line-height: 18dp; }
+textarea { line-height: 1.35; }
+
+input.checkbox {
+	width: 16dp; height: 16dp;
+	border-radius: 5dp;
+	background-color: #00000040;
+	border: 1dp #ffffff33;
+	transition: background-color border-color 0.15s cubic-out;
+}
+input.checkbox:checked { background-color: #4c8dff; border-color: #4c8dff; }
+
+input.range { height: 16dp; }
+input.range slidertrack { margin-top: 7dp; height: 3dp; border-radius: 2dp; background-color: #ffffff22; }
+input.range sliderbar { width: 14dp; height: 14dp; margin-top: 1dp; border-radius: 7dp; background-color: #e7eaf3; }
+input.range sliderbar:hover { background-color: #ffffff; }
+input.range sliderarrowdec, input.range sliderarrowinc { width: 0; height: 0; }
+
+.tooltip {
+	position: absolute;
+	padding: 4dp 8dp;
+	border-radius: 6dp;
+	font-size: 11dp;
+	background-color: #0b0d14f0;
+	border: 1dp #ffffff1a;
+}
